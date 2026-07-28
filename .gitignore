@@ -1,15 +1,32 @@
-.idea/*
-.nyc_output
-build
-node_modules
-test
-src/**.js
-coverage
+# Shared VS Code settings are versioned; personal workspace files are not.
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.json
+/.idea/
+
+# Dependencies and local environment.
+/node_modules/
+/.env
+/.env.*
+!/.env.example
+/.nyc_output/
+/.seal/
+
+# Generated build, release and API-discovery output.
+/.dev/
+/api/discovered/
+/build/
+/coverage/
+/dev/
+/dist/
+/release/
+/src/**/*.js
+/test/
+*.tsbuildinfo
+
+# Local operating-system and tool artifacts.
+.DS_Store
+Thumbs.db
 *.log
-yarn.lock
-*.zip
 *.xlsx
-package-lock.json
-.dev/
-dist/
-dev/
+*.zip

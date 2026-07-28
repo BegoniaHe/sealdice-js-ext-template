@@ -1,0 +1,71 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.formatOnSave": false,
+  "prettier.requireConfig": true,
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "files.exclude": {
+    "**/.git": true,
+    ".dev": true,
+    "**/.idea": true,
+    "**/.seal": true,
+    "**/node_modules": true,
+    "api/discovered": true,
+    "build": true,
+    "coverage": true,
+    "dev": true,
+    "dist": true,
+    "reference": true,
+    "release": true
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.dev/**": true,
+    "**/.seal/**": true,
+    "**/api/discovered/**": true,
+    "**/build/**": true,
+    "**/coverage/**": true,
+    "**/dev/**": true,
+    "**/dist/**": true,
+    "**/node_modules/**": true,
+    "**/reference/**": true,
+    "**/release/**": true
+  },
+  "search.exclude": {
+    "**/.git": true,
+    "**/.dev": true,
+    "**/.seal": true,
+    "**/api/discovered": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/dev": true,
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/reference": true,
+    "**/release": true
+  }
+}

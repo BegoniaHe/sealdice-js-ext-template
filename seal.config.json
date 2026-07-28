@@ -1,0 +1,15 @@
+{
+  "$schema": "./api/schema/seal.config.schema.json",
+  "schemaVersion": 1,
+  "packageManager": "npm",
+  "sealDice": {
+    "targets": ["1.5.0", "1.5.1", "1.6.0"],
+    "defaultTarget": "1.5.0",
+    "compatibilityProfile": "compat-1.5.x",
+    "compatibilityTargets": ["1.5.0", "1.5.1"]
+  },
+  "release": {
+    "directory": "release",
+    "checksum": "sha256"
+  }
+}

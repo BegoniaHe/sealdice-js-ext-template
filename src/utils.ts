@@ -1,5 +1,1 @@
-
-export const nameList = [
-    '氪豹',
-    '林冲'
-]
+export const nameList = ['氪豹', '林冲'];

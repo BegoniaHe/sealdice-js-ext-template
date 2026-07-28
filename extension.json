@@ -1,0 +1,10 @@
+{
+  "$schema": "./api/schema/extension.schema.json",
+  "id": "sealdice-js-ext-template",
+  "name": "SealDice JavaScript Extension Template",
+  "author": "Template Author",
+  "version": "1.0.0",
+  "description": "A TypeScript template for SealDice JavaScript extensions.",
+  "license": "MIT",
+  "homepageUrl": "https://github.com/sealdice/sealdice-js-ext-template"
+}

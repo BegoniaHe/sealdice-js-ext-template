@@ -1,2 +1,10 @@
-# package.json is formatted by package managers, so we ignore it here
-package.json
+reference
+node_modules
+api/discovered
+build
+coverage
+.dev
+dev
+dist
+release
+.seal

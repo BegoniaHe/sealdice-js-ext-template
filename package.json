@@ -1,44 +1,43 @@
 {
-  "name": "a-long-story",
+  "name": "sealdice-js-ext-template",
   "version": "1.0.0",
-  "description": "once upon a time, ...",
-  "main": "build/index.js",
-  "typings": "build/index.d.ts",
-  "repository": "https://github.com/sealdice/seal-swordworld",
-  "license": "Apache-2.0",
+  "description": "SealDice JavaScript extension template",
+  "private": true,
+  "license": "MIT",
   "keywords": [],
   "scripts": {
-    "build": "cross-env NODE_ENV=production node tools/build.js",
-    "build-dev": "cross-env NODE_ENV=dev node tools/build.js"
+    "build": "./sealw build --target compat-1.5.x",
+    "check": "./sealw check --all-targets",
+    "dev": "./sealw watch --target compat-1.5.x",
+    "format": "./sealw fmt",
+    "format:check": "./sealw fmt --check",
+    "lint": "./sealw lint",
+    "test": "./sealw test --all-targets",
+    "typecheck": "./sealw typecheck --target compat-1.5.x",
+    "task:format": "prettier --write .",
+    "task:format-check": "prettier --check .",
+    "task:lint": "eslint .",
+    "task:typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=10"
+    "node": ">=26.5.0 <27",
+    "npm": ">=12.0.1 <13"
   },
+  "packageManager": "npm@12.0.1",
   "dependencies": {
-    "lodash-es": "^4.17.21"
+    "lodash-es": "4.18.1"
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.12",
-    "cross-env": "^7.0.3",
-    "esbuild": "^0.21.4",
-    "fs-extra": "^11.2.0",
-    "source-map-support": "^0.5.21"
+    "@eslint/js": "10.0.1",
+    "@types/lodash-es": "4.17.12",
+    "esbuild": "0.28.1",
+    "eslint": "10.8.0",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.65.0"
   },
-  "files": [
-    "build/main",
-    "build/module",
-    "!**/*.spec.*",
-    "!**/*.json",
-    "CHANGELOG.md",
-    "LICENSE",
-    "README.md"
-  ],
-  "config": {
-    "commitizen": {
-      "path": "cz-conventional-changelog"
-    }
-  },
-  "prettier": {
-    "singleQuote": true
+  "allowScripts": {
+    "esbuild@0.28.1": true
   }
 }
