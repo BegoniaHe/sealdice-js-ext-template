@@ -1,0 +1,85 @@
+name: Refresh SealDice API Profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Exact SealDice target
+        required: true
+        type: choice
+        options: ['1.5.0', '1.5.1', '1.6.0']
+      core_ref:
+        description: Exact sealdice-core commit (use the build-repo gitlink for distribution releases)
+        required: true
+        type: string
+      open_pull_request:
+        description: Create a pull request for the generated patch
+        default: false
+        required: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.5.0
+          cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - run: npm install --global npm@12.0.1
+      - run: npm ci
+      - name: Fetch read-only core input
+        env:
+          CORE_REF: ${{ inputs.core_ref }}
+        run: |
+          git clone --filter=blob:none https://github.com/sealdice/sealdice-core.git "$RUNNER_TEMP/sealdice-core"
+          git -C "$RUNNER_TEMP/sealdice-core" fetch --depth 1 origin "$CORE_REF"
+          git -C "$RUNNER_TEMP/sealdice-core" checkout --detach FETCH_HEAD
+      - name: Generate checked-in profile artifacts
+        env:
+          TARGET: ${{ inputs.target }}
+        run: ./sealw api update --core "$RUNNER_TEMP/sealdice-core" --target "$TARGET"
+      - run: ./sealw api check
+      - name: Produce reviewable patch
+        id: patch
+        run: |
+          git diff --check
+          git diff --binary > "$RUNNER_TEMP/api-profile-update.patch"
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload API profile patch
+        if: steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: seal-api-profile-${{ inputs.target }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/api-profile-update.patch
+          if-no-files-found: error
+      - name: Create refresh pull request
+        if: inputs.open_pull_request && steps.patch.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          branch="automation/api-profile-${TARGET}-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api types
+          git commit -m "chore(api): refresh ${TARGET} profile"
+          git push origin "$branch"
+          gh pr create \
+            --base "${GITHUB_REF_NAME}" \
+            --head "$branch" \
+            --title "chore(api): refresh ${TARGET} profile" \
+            --body "Generated from workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."

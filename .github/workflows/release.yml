@@ -1,0 +1,57 @@
+name: Release SealDice Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: SealDice API target represented by this release
+        required: true
+        default: compat-1.5.x
+        type: choice
+        options: ['compat-1.5.x', '1.5.0', '1.5.1', '1.6.0']
+      tag:
+        description: GitHub release tag, for example v1.2.3
+        required: true
+        type: string
+      draft:
+        description: Create the release as a draft
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.5.0
+          cache: npm
+      - run: npm install --global npm@12.0.1
+      - run: npm ci
+      - name: Build and package
+        env:
+          TARGET: ${{ inputs.target }}
+        run: ./sealw package --target "$TARGET"
+      - name: Attest release artifact
+        uses: actions/attest@v4
+        with:
+          subject-path: release/*.js
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          draft_flag=""
+          if [ "$DRAFT" = "true" ]; then draft_flag="--draft"; fi
+          gh release create "$TAG" $draft_flag \
+            --title "$TAG" \
+            release/*.js release/*.sha256 release/manifest.json
