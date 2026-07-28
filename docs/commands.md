@@ -10,17 +10,22 @@ are started with argument arrays.
 | `install [--update-lock]` | Run `npm ci`; `--update-lock` deliberately runs `npm install`.                               |
 | `fmt [--check]`, `lint`   | Formatting and lint checks.                                                                  |
 | `typecheck --target <id>` | Select exactly one declaration profile.                                                      |
-| `test --target <id>       | --all-targets`                                                                               | Run Node unit/mock tests and Node VM bundle smoke tests.                                 |
-| `check --target <id>      | --all-targets`                                                                               | CI pipeline. `--all-targets` checks compat declarations and smoke-tests each exact host. |
+| `test --target <id>       | --all-targets`                                                                               | Run Node unit/mock tests and Node VM bundle smoke tests.                               |
+| `check --target <id>      | --all-targets`                                                                               | CI pipeline. `--all-targets` typechecks every profile and smoke-tests each exact host. |
 | `watch --target <id>`     | esbuild `context().watch()` development bundle.                                              |
 | `build --target <id>`     | Typecheck then create `dist/sealdice-js-ext.js`.                                             |
 | `package --target <id>`   | Validate extension metadata, run target checks, build, checksum, and write release manifest. |
 | `clean`                   | Removes only `dev/`, `dist/`, `release/`, `.seal/cache/` after realpath checks.              |
 
-The default target is `1.5.0`; target ids are `1.5.0`, `1.5.1`, `1.6.0`, and
-`compat-1.5.x`. The compatibility profile deliberately contains only the two
-1.5 releases. CLI target selection wins over `SEAL_TARGET`, which wins over
-`seal.config.json`. `--all-targets` cannot be combined with `--target`.
+Target ids come from `seal.config.json`; run `./sealw target list` to inspect them. The checked-in
+default is `compat-1.5.x`, whose members are exactly `1.5.0` and `1.5.1`. A compatibility id is a
+named tested set, not an assertion that every release matched by its spelling works. CLI target
+selection wins over `SEAL_TARGET`, which wins over `seal.config.json`. `--all-targets` cannot be
+combined with `--target`.
+
+The CLI writes a short target-specific tsconfig to `.seal/cache/` for each typecheck or build. It is
+generated from the profile registry, so adding an exact version does not require another checked-in
+`tsconfig.*.json` file.
 
 ## API Commands
 
@@ -43,9 +48,10 @@ environment errors exit with `2`; task failures use `3` or `5` for an external
 tool failure.
 
 `api update` regenerates all dependent declarations, reports and the compatibility profile after
-updating an exact target. `api generate --check` is non-mutating. All profile, declaration and
-report writes are atomic. `api probe` is optional and always deletes its temporary copy, including
-on test failure.
+updating an exact target. The target must first be registered as `kind: "exact"` in
+`seal.config.json`; compatibility targets are generated from their declared members and cannot be
+scanned directly. `api generate --check` is non-mutating. All profile, declaration and report writes
+are atomic. `api probe` is optional and always deletes its temporary copy, including on test failure.
 
 For a distribution release whose core repository does not carry a matching tag,
 pass the exact core gitlink to `api update`. The target override must record

@@ -6,6 +6,20 @@ builds, or changes the supplied core. It records `Dice.JsInit` `Set` bindings,
 nested objects, Go function signatures, factory returns, structs, fields,
 aliases, container types and `jsbind` tags.
 
+## Target Registry
+
+`seal.config.json` is the single target registry. An exact profile has a canonical
+[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) id, while a compatibility profile names a finite,
+ascending list of exact `members`. It must not be read as a promise that unlisted patch releases are
+supported. JSON structure is validated against the repository schema by Ajv; semantic-version syntax
+and member order are validated by `semver`.
+
+To add a distribution version, first add its exact profile entry and optional `typecheckInclude` globs
+to `seal.config.json`, then add the override and follow the update procedure below. This is deliberately
+committed before the API refresh workflow runs: the workflow accepts a free-text target but the CLI will
+only update an already registered exact profile. After reviewing the resulting profile, add it to a
+compatibility profile only when its API differences are safe for a single bundle.
+
 1. Identify the distribution release and its exact source input. For a core
    release this can be a core tag; for a build-repository release it is the
    build tag plus its core gitlink.
@@ -16,7 +30,7 @@ aliases, container types and `jsbind` tags.
 5. Record the distribution, source, artifact and runtime evidence in the
    override's `provenance` object before updating the profile.
 6. Run `./sealw api update --core <path> --target <target>`. This also regenerates all dependent
-   declarations, reports and the 1.5 compatibility profile.
+   declarations, reports and every compatibility profile that lists the exact target as a member.
 7. Review `api/profiles/`, `types/profiles/`, and `api/reports/`.
 8. Run `./sealw api diff --from 1.5.0 --to 1.5.1` and
    `./sealw check --all-targets`.
@@ -27,10 +41,10 @@ application-specific `interface{}` values. The AST output is the drift
 baseline, while `types/seal.d.ts` and an override express the public TypeScript
 contract.
 
-The compatibility generator retains equal entries and makes members introduced
-only in the newer profile optional. It fails for an incompatible signature until
-`api/overrides/compat-1.5.x.json` explicitly permits an adapter strategy. A
-single bundle must use runtime feature detection for optional APIs.
+The compatibility generator retains entries equal across every member and makes
+an entry optional when any member lacks it. It fails for an incompatible signature until the relevant
+`api/overrides/<compatibility-id>.json` explicitly permits an adapter strategy. A single bundle must
+use runtime feature detection for optional APIs.
 
 ## Distribution Provenance and SealDice 1.6.0
 
@@ -60,9 +74,9 @@ injection discrepancy and is explicitly acknowledged in
 
 The 1.6 profile records seven changed signatures: the six configuration
 registrars and `registerTask` add an optional TypeScript `group` argument. It
-is an exact target only. `compat-1.5.x` remains derived from `1.5.0` and
-`1.5.1`; do not add a 1.5-to-1.6 compatibility package until a separate policy
-and runtime review approves it.
+is an exact target only. `compat-1.5.x` remains derived from the explicitly listed `1.5.0` and
+`1.5.1` members; do not add a 1.5-to-1.6 compatibility package until a separate policy and runtime
+review approves it.
 
 The optional goja probe has also passed against the same source commit. It
 observed no missing or unexpected members, arity differences, kind differences,
