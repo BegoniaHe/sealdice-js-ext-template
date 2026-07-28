@@ -1,7 +1,12 @@
 {
   "$schema": "./api/schema/seal.config.schema.json",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "packageManager": "npm",
+  "build": {
+    "entry": "src/index.ts",
+    "ecmaTarget": "es6",
+    "bundleFileName": "sealdice-js-ext.js"
+  },
   "sealDice": {
     "profiles": [
       { "id": "1.5.0", "kind": "exact" },
@@ -21,6 +26,33 @@
   },
   "release": {
     "directory": "release",
-    "checksum": "sha256"
+    "checksum": "sha256",
+    "defaultFormats": ["js"]
+  },
+  "sealpack": {
+    "packageId": "template/sealdice-js-ext-template",
+    "minSealDice": "1.6.0",
+    "scriptPath": "scripts/sealdice-js-ext.js",
+    "authors": [],
+    "keywords": [],
+    "repository": "",
+    "dependencies": {},
+    "permissions": {
+      "network": false,
+      "networkHosts": [],
+      "fileRead": [],
+      "fileWrite": [],
+      "dangerous": false,
+      "httpServer": false,
+      "ipc": []
+    },
+    "readme": "README.md",
+    "assets": [],
+    "store": {
+      "category": "tool",
+      "icon": "",
+      "banner": "",
+      "screenshots": []
+    }
   }
 }

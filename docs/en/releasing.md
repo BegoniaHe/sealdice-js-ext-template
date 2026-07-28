@@ -16,6 +16,12 @@ Replace all default values in `extension.json`:
 `./sealw package` deliberately rejects the template id, name, author, and
 homepage. This prevents publishing a renamed copy incompletely.
 
+For a `.sealpack` release, also replace `sealpack.packageId` in
+`seal.config.json`. It is the stable store/package identity in
+`author/package` form and is deliberately separate from the userscript `id`.
+Review `minSealDice`, the staged script path, explicit asset paths, store
+metadata, dependencies, and requested permissions before publishing.
+
 ## 2. Verify the supported target
 
 For one exact SealDice version:
@@ -36,8 +42,23 @@ mean all present and future 1.5 releases.
 
 ## 3. Create the release files
 
+The legacy JavaScript artifact remains available for any configured target:
+
 ```sh
 ./sealw package --target compat-1.5.x
+```
+
+To create a SealDice 1.6+ package, select an exact target that satisfies
+`sealpack.minSealDice`:
+
+```sh
+./sealw package --format sealpack --target 1.6.0
+```
+
+To distribute both forms for that exact target:
+
+```sh
+./sealw package --format both --target 1.6.0
 ```
 
 The command repeats the required checks and writes:
@@ -45,12 +66,16 @@ The command repeats the required checks and writes:
 ```text
 release/<extension-id>-<version>.js
 release/<extension-id>-<version>.js.sha256
+release/<package-name>@<version>.sealpack
+release/<package-name>@<version>.sealpack.sha256
 release/manifest.json
 ```
 
-Review `manifest.json`: its id, version, target profile, profile hash, and
-SHA-256 must match the files you plan to distribute. Upload the `.js` file to
-SealDice; publish the checksum and manifest alongside it when possible.
+`manifest.json` records every selected artifact as well as the target profile
+and profile hash. Review every SHA-256 before distribution. Upload `.js` files
+through the legacy JavaScript script flow; upload `.sealpack` files through the
+SealDice 1.6+ package flow or publish them to the extension store. Publish the
+checksums and manifest alongside either format when possible.
 
 Do not distribute files from `dev/`. They are development artifacts with a
 source map and can change while `watch` is running.
@@ -61,10 +86,13 @@ The manual **Release SealDice Extension** workflow follows the same process.
 It requires:
 
 - `target`: a target already registered in `seal.config.json`.
+- `format`: `js`, `sealpack`, or `both`. `sealpack` needs an exact target at
+  or above `sealpack.minSealDice`.
 - `tag`: exactly `v` followed by `extension.json`'s version, for example
   `v1.2.3`.
 - `draft`: normally leave this enabled, inspect the generated assets, then
   publish the GitHub release.
 
-The workflow runs `package`, attests the JavaScript artifact, and attaches the
-bundle, checksum, and manifest to the release.
+The workflow has a `format` input matching the CLI (`js`, `sealpack`, or
+`both`). It runs `package`, attests the generated release files, and attaches
+the selected artifacts, checksums, and manifest to the release.

@@ -34,8 +34,111 @@ function assertSafeTypecheckPath(file) {
   );
 }
 
+function assertSafeProjectPath(file, label, { prefix = null } = {}) {
+  const segments = typeof file === 'string' ? file.split(/[\\/]/u) : [];
+  assert(
+    typeof file === 'string' &&
+      file.length > 0 &&
+      !path.isAbsolute(file) &&
+      !/^[A-Za-z]:/.test(file) &&
+      !file.includes('\\') &&
+      !segments.some(
+        (segment) => !segment || segment === '.' || segment === '..',
+      ),
+    `${label} must be a non-empty slash-separated project-relative path without .. segments`,
+  );
+  if (prefix) {
+    assert(
+      file === prefix || file.startsWith(`${prefix}/`),
+      `${label} must stay under ${prefix}/`,
+    );
+  }
+  return file;
+}
+
+function assertPackageID(id, label = 'sealpack.packageId') {
+  const segments = id.split('/');
+  assert(
+    segments.length === 2 &&
+      segments.every(
+        (segment) =>
+          /^[\p{L}\p{N}_-]{1,64}$/u.test(segment) &&
+          segment !== '.' &&
+          segment !== '..',
+      ),
+    `${label} must use the author/package form with valid segments`,
+  );
+}
+
+function assertCanonicalVersion(version, label) {
+  assert(
+    semver.valid(version) === version,
+    `${label} must be a canonical semantic version`,
+  );
+}
+
+function assertSealpackAssetPath(file, label) {
+  return assertSafeProjectPath(file, label, { prefix: 'assets' });
+}
+
+function validateSealpackConfig(config) {
+  const sealpack = config.sealpack;
+  assertPackageID(sealpack.packageId);
+  assertCanonicalVersion(sealpack.minSealDice, 'sealpack.minSealDice');
+  const scriptPath = assertSafeProjectPath(
+    sealpack.scriptPath,
+    'sealpack.scriptPath',
+    { prefix: 'scripts' },
+  );
+  assert(
+    scriptPath.endsWith('.js'),
+    'sealpack.scriptPath must point to a JavaScript file',
+  );
+  assert(
+    !['*', '?', '[', ']'].some((character) => scriptPath.includes(character)),
+    'sealpack.scriptPath must identify one staged JavaScript file, not a glob',
+  );
+  assert(
+    sealpack.readme === 'README.md',
+    'sealpack.readme must be the root README.md file',
+  );
+
+  for (const asset of sealpack.assets)
+    assertSealpackAssetPath(asset, 'sealpack.assets entry');
+  for (const [field, value] of Object.entries({
+    'sealpack.store.icon': sealpack.store.icon,
+    'sealpack.store.banner': sealpack.store.banner,
+  })) {
+    if (value) assertSealpackAssetPath(value, field);
+  }
+  for (const screenshot of sealpack.store.screenshots)
+    assertSealpackAssetPath(screenshot, 'sealpack.store.screenshots entry');
+
+  for (const [packageID, constraint] of Object.entries(sealpack.dependencies)) {
+    assertPackageID(packageID, 'sealpack.dependencies key');
+    assert(
+      semver.validRange(constraint) !== null,
+      `sealpack dependency ${packageID} has an invalid version range`,
+    );
+  }
+  for (const packageID of sealpack.permissions.ipc)
+    if (packageID !== '*')
+      assertPackageID(packageID, 'sealpack.permissions.ipc entry');
+}
+
 export async function validateConfig(config) {
   await validateSchema(config);
+  const buildEntry = assertSafeProjectPath(config.build.entry, 'build.entry', {
+    prefix: 'src',
+  });
+  assert(
+    buildEntry.endsWith('.ts'),
+    'build.entry must point to a TypeScript source file',
+  );
+  assert(
+    path.basename(config.build.bundleFileName) === config.build.bundleFileName,
+    'build.bundleFileName must not contain a directory',
+  );
   const profiles = config.sealDice.profiles;
   const ids = new Set();
   const exact = new Map();
@@ -46,10 +149,7 @@ export async function validateConfig(config) {
     );
     ids.add(profile.id);
     if (profile.kind !== 'exact') continue;
-    assert(
-      semver.valid(profile.id) === profile.id,
-      `Exact profile id must be a canonical semantic version: ${profile.id}`,
-    );
+    assertCanonicalVersion(profile.id, `Exact profile id ${profile.id}`);
     for (const file of profile.typecheckInclude ?? [])
       assertSafeTypecheckPath(file);
     exact.set(profile.id, profile);
@@ -74,6 +174,7 @@ export async function validateConfig(config) {
     ids.has(config.sealDice.defaultTarget),
     `sealDice.defaultTarget must reference a configured profile: ${config.sealDice.defaultTarget}`,
   );
+  validateSealpackConfig(config);
   return config;
 }
 

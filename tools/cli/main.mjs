@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -10,14 +9,8 @@ import {
   resolvePackageManager,
 } from './lib/config.mjs';
 import { CliError, assert } from './lib/errors.mjs';
-import {
-  removeKnownDirectory,
-  sha256,
-  stableJson,
-  writeJsonAtomic,
-  writeAtomic,
-} from './lib/files.mjs';
-import { artifactName, loadExtensionMetadata } from './lib/metadata.mjs';
+import { removeKnownDirectory, sha256, stableJson } from './lib/files.mjs';
+import { loadExtensionMetadata } from './lib/metadata.mjs';
 import { fromRoot, rootDirectory } from './lib/paths.mjs';
 import {
   dependencyCommand,
@@ -33,6 +26,18 @@ import {
   targetFromArguments,
   tsconfigForTarget,
 } from './lib/target.mjs';
+import { buildBundle, watchBundle } from '../tasks/build.mjs';
+import { runTaskGraph } from '../tasks/graph.mjs';
+import {
+  archiveSealpack,
+  assertSealpackTarget,
+  stageSealpack,
+} from '../tasks/sealpack.mjs';
+import {
+  releaseJavaScriptArtifact,
+  writeArtifactChecksums,
+  writeReleaseManifest,
+} from '../tasks/release.mjs';
 
 const usage = `Usage:
   ./sealw <command> [options]
@@ -51,7 +56,8 @@ Core commands:
                                Run the standard verification pipeline
   watch [--target <id>]        Rebuild development bundle on changes
   build [--target <id>]        Build dist artifact
-  package [--target <id>]      Verify then produce a release artifact and checksum
+  package [--format <format>] [--target <id>]
+                               Verify then produce js, sealpack, or both release artifacts
   clean                        Remove known generated outputs only
 
 Dependency commands:
@@ -105,9 +111,16 @@ async function lint() {
 }
 
 async function build(config, target, mode = 'production') {
-  await typecheck(config, target);
-  const { buildBundle } = await import('../tasks/build.mjs');
-  const output = await buildBundle({ config, mode, target });
+  const tasks = {
+    typecheck: {
+      run: () => typecheck(config, target),
+    },
+    bundle: {
+      dependencies: ['typecheck'],
+      run: () => buildBundle({ config, mode, target }),
+    },
+  };
+  const output = (await runTaskGraph(tasks, ['bundle'])).get('bundle');
   process.stdout.write(
     `Built ${path.relative(rootDirectory, output)} for ${target}.\n`,
   );
@@ -124,7 +137,6 @@ async function runHostTests(target) {
 }
 
 async function bundleSmoke(config, target) {
-  const { buildBundle } = await import('../tasks/build.mjs');
   await buildBundle({ config, mode: 'development', target });
   await runChecked(process.execPath, [
     'tools/tasks/bundle-smoke.mjs',
@@ -194,49 +206,103 @@ async function doctor(config, json) {
   if (problems.length) throw new CliError('Environment diagnosis failed');
 }
 
-async function packageArtifact(config, target) {
-  const extension = await loadExtensionMetadata({ release: true });
+function packageFormats(config, argumentsList) {
+  const index = argumentsList.indexOf('--format');
+  if (index === -1) return config.release.defaultFormats;
+  const value = argumentsList[index + 1];
+  if (!value || value.startsWith('--'))
+    throw new CliError('--format requires js, sealpack, or both');
+  if (value === 'both') return ['js', 'sealpack'];
+  if (value === 'js' || value === 'sealpack') return [value];
+  throw new CliError('--format requires js, sealpack, or both');
+}
+
+async function packageArtifacts(config, target, formats) {
   const profile = profileForTarget(config, target);
-  await check(
-    config,
-    profile.kind === 'compatibility' ? ['--all-targets'] : ['--target', target],
-  );
-  const output = await build(config, target, 'production');
-  const artifact = artifactName(extension);
   const releaseDirectory = fromRoot(config.release.directory);
-  const releasePath = path.join(releaseDirectory, artifact);
-  await fs.mkdir(releaseDirectory, { recursive: true });
-  const content = await fs.readFile(output);
-  const temporary = path.join(
-    releaseDirectory,
-    `.${artifact}.${process.pid}.${crypto.randomUUID()}.tmp`,
-  );
-  try {
-    await fs.writeFile(temporary, content);
-    await fs.rename(temporary, releasePath);
-  } finally {
-    await fs.rm(temporary, { force: true });
+  if (formats.includes('sealpack')) {
+    if (profile.kind !== 'exact')
+      throw new CliError(
+        'sealpack packaging requires an exact SealDice target',
+      );
   }
-  const digest = sha256(content);
-  await writeAtomic(`${releasePath}.sha256`, `${digest}  ${artifact}\n`);
-  const apiProfile = JSON.parse(
-    await fs.readFile(fromRoot('api', 'profiles', `${target}.json`), 'utf8'),
-  );
-  const manifest = {
-    artifact,
-    author: extension.author,
-    id: extension.id,
-    license: extension.license,
-    name: extension.name,
-    profile: target,
-    profileHash: `sha256:${sha256(stableJson(apiProfile))}`,
-    sha256: digest,
-    version: extension.version,
+  const extension = await loadExtensionMetadata({ release: true });
+  if (formats.includes('sealpack'))
+    assertSealpackTarget(config, extension, target);
+
+  const packageTaskNames = formats.map((format) => `package:${format}`);
+  const tasks = {
+    verify: {
+      run: () =>
+        check(
+          config,
+          profile.kind === 'compatibility'
+            ? ['--all-targets']
+            : ['--target', target],
+        ),
+    },
+    bundle: {
+      dependencies: ['verify'],
+      run: () => buildBundle({ config, mode: 'production', target }),
+    },
+    'package:js': {
+      dependencies: ['bundle'],
+      run: ({ results }) =>
+        releaseJavaScriptArtifact({
+          bundlePath: results.get('bundle'),
+          extension,
+          releaseDirectory,
+        }),
+    },
+    'stage:sealpack': {
+      dependencies: ['bundle'],
+      run: ({ results }) =>
+        stageSealpack({
+          bundlePath: results.get('bundle'),
+          config,
+          extension,
+        }),
+    },
+    'package:sealpack': {
+      dependencies: ['stage:sealpack'],
+      run: ({ results }) =>
+        archiveSealpack({
+          config,
+          extension,
+          releaseDirectory,
+          stage: results.get('stage:sealpack'),
+        }),
+    },
+    manifest: {
+      dependencies: packageTaskNames,
+      run: async ({ results }) => {
+        const artifacts = formats.map((format) =>
+          results.get(`package:${format}`),
+        );
+        await writeArtifactChecksums({ artifacts, releaseDirectory });
+        const apiProfile = JSON.parse(
+          await fs.readFile(
+            fromRoot('api', 'profiles', `${target}.json`),
+            'utf8',
+          ),
+        );
+        return writeReleaseManifest({
+          artifacts,
+          extension,
+          profileHash: `sha256:${sha256(stableJson(apiProfile))}`,
+          releaseDirectory,
+          target,
+        });
+      },
+    },
   };
-  await writeJsonAtomic(path.join(releaseDirectory, 'manifest.json'), manifest);
-  process.stdout.write(
-    `Packaged ${path.relative(rootDirectory, releasePath)}\n`,
-  );
+  const results = await runTaskGraph(tasks, ['manifest']);
+  for (const format of formats) {
+    const artifact = results.get(`package:${format}`);
+    process.stdout.write(
+      `Packaged ${path.relative(rootDirectory, path.join(releaseDirectory, artifact.artifact))}\n`,
+    );
+  }
 }
 
 async function targetCommand(config, argumentsList) {
@@ -329,11 +395,14 @@ async function main() {
   if (command === 'watch') {
     const target = resolveTarget(config, argumentsList);
     await typecheck(config, target);
-    const { watchBundle } = await import('../tasks/build.mjs');
     return watchBundle({ config, target });
   }
   if (command === 'package')
-    return packageArtifact(config, resolveTarget(config, argumentsList));
+    return packageArtifacts(
+      config,
+      resolveTarget(config, argumentsList),
+      packageFormats(config, argumentsList),
+    );
   if (command === 'clean') {
     assert(
       !targetFromArguments(argumentsList),

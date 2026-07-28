@@ -11,13 +11,11 @@ import {
 import { rootDirectory } from '../cli/lib/paths.mjs';
 import { tsconfigForTarget } from '../cli/lib/target.mjs';
 
-const filename = 'sealdice-js-ext.js';
-
-export function outputPath(mode) {
+export function outputPath(config, mode) {
   return path.join(
     rootDirectory,
     mode === 'production' ? 'dist' : 'dev',
-    filename,
+    config.build.bundleFileName,
   );
 }
 
@@ -28,26 +26,26 @@ async function buildOptions({ config, mode, target, outfile }) {
     banner: { js: header },
     bundle: true,
     define: { 'process.env.NODE_ENV': JSON.stringify(mode) },
-    entryPoints: [path.join(rootDirectory, 'src', 'index.ts')],
+    entryPoints: [path.join(rootDirectory, config.build.entry)],
     format: 'iife',
     logLevel: 'error',
     minify: isProduction,
     outfile,
     platform: 'browser',
     sourcemap: isProduction ? false : 'external',
-    target: 'es6',
+    target: config.build.ecmaTarget,
     treeShaking: true,
     tsconfig: await tsconfigForTarget(config, target),
   };
 }
 
 export async function buildBundle({ config, mode = 'production', target }) {
-  const destination = outputPath(mode);
+  const destination = outputPath(config, mode);
   const directory = path.dirname(destination);
   await fs.mkdir(directory, { recursive: true });
   const temporary = path.join(
     directory,
-    `.${filename}.${process.pid}.${crypto.randomUUID()}.tmp.js`,
+    `.${path.basename(destination)}.${process.pid}.${crypto.randomUUID()}.tmp.js`,
   );
   const temporaryMap = `${temporary}.map`;
   try {
@@ -73,7 +71,7 @@ export async function buildBundle({ config, mode = 'production', target }) {
 }
 
 export async function watchBundle({ config, target }) {
-  const outfile = outputPath('development');
+  const outfile = outputPath(config, 'development');
   await fs.mkdir(path.dirname(outfile), { recursive: true });
   const buildContext = await context(
     await buildOptions({ config, mode: 'development', target, outfile }),

@@ -10,10 +10,40 @@ import {
 
 function config(profiles, defaultTarget = profiles[0].id) {
   return {
+    build: {
+      bundleFileName: 'extension.js',
+      ecmaTarget: 'es6',
+      entry: 'src/index.ts',
+    },
     packageManager: 'npm',
-    release: { checksum: 'sha256', directory: 'release' },
-    schemaVersion: 2,
+    release: {
+      checksum: 'sha256',
+      defaultFormats: ['js'],
+      directory: 'release',
+    },
+    schemaVersion: 3,
     sealDice: { defaultTarget, profiles },
+    sealpack: {
+      assets: [],
+      authors: [],
+      dependencies: {},
+      keywords: [],
+      minSealDice: '1.6.0',
+      packageId: 'alice/demo',
+      permissions: {
+        dangerous: false,
+        fileRead: [],
+        fileWrite: [],
+        httpServer: false,
+        ipc: [],
+        network: false,
+        networkHosts: [],
+      },
+      readme: 'README.md',
+      repository: '',
+      scriptPath: 'scripts/extension.js',
+      store: { banner: '', category: 'tool', icon: '', screenshots: [] },
+    },
   };
 }
 

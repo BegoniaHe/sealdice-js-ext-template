@@ -4,8 +4,10 @@
 profile，以及覆盖前两个版本的 `compat-1.5.x` profile；后续支持版本由配置注册，而非写死在
 CLI 中。它提供可复现的构建、目标 API 声明、profile 驱动 mock、发布校验和 API 漂移维护工具。
 
-`extension.json` 是扩展身份的唯一来源：运行时扩展 ID、userscript header、发布文件名和
-release manifest 都由它生成。先修改它，再开始开发。
+`extension.json` 是旧式 JavaScript 扩展的运行时身份来源：运行时扩展 ID、userscript header 与
+`.js` 发布文件名由它生成。构建参数和 `.sealpack` 的商店身份、权限与资源清单则放在
+[`seal.config.json`](seal.config.json)；两种身份有意分离。先修改 `extension.json`，需要发布扩展包时
+再配置 `sealpack.packageId`。
 
 ## Quick Start
 
@@ -56,7 +58,8 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 ./sealw check --target <id>|--all-targets       Run formatting, lint, typechecks and tests
 ./sealw watch --target <id>                     Rebuild dev/sealdice-js-ext.js on source changes
 ./sealw build --target <id>                     Build dist/sealdice-js-ext.js
-./sealw package --target <id>                   Verify and create release artifacts
+./sealw package --format js|sealpack|both --target <id>
+                                                   Verify and create release artifacts
 ./sealw clean                                   Remove only generated directories
 ```
 
@@ -68,7 +71,11 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 
 ## Release
 
-`package` 会拒绝模板默认身份、执行完整目标检查、生成 production bundle，并写入：
+`package` 会拒绝模板默认身份、执行完整目标检查并生成 production bundle。默认格式是 `.js`，
+因此旧版 1.5.x 发布流程不变；`.sealpack` 只能使用满足 `sealpack.minSealDice` 的精确 target
+（模板默认是 `1.6.0`）。
+
+JavaScript 发布会写入：
 
 ```text
 release/<extension-id>-<version>.js
@@ -82,8 +89,17 @@ release/manifest.json
 ./sealw package --target compat-1.5.x
 ```
 
+发布 SealDice 1.6+ 扩展包时，另行设置 `sealpack.packageId`，然后使用：
+
+```sh
+./sealw package --format sealpack --target 1.6.0
+```
+
+可用 `--format both` 同时生成两种格式。每个产物都有 `.sha256` 文件，`release/manifest.json`
+会列出本次选择的所有产物。
+
 手动 GitHub Actions 工作流 **Release SealDice Extension** 会重复上述检查、生成构建来源证明，
-并创建 draft 或正式 GitHub Release。详见[中文发布指南](docs/zh/releasing.md)或
+并根据其 `format` 输入创建 draft 或正式 GitHub Release。详见[中文发布指南](docs/zh/releasing.md)或
 [English release guide](docs/en/releasing.md)。
 
 ## API Profiles

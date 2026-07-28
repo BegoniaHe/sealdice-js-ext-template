@@ -4,11 +4,31 @@
   "title": "SealDice template configuration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "packageManager", "sealDice", "release"],
+  "required": [
+    "schemaVersion",
+    "packageManager",
+    "build",
+    "sealDice",
+    "release",
+    "sealpack"
+  ],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "packageManager": { "const": "npm" },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "ecmaTarget", "bundleFileName"],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1 },
+        "ecmaTarget": { "type": "string", "minLength": 1 },
+        "bundleFileName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.js$"
+        }
+      }
+    },
     "sealDice": {
       "type": "object",
       "additionalProperties": false,
@@ -66,10 +86,112 @@
     "release": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["directory", "checksum"],
+      "required": ["directory", "checksum", "defaultFormats"],
       "properties": {
         "directory": { "const": "release" },
-        "checksum": { "const": "sha256" }
+        "checksum": { "const": "sha256" },
+        "defaultFormats": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["js", "sealpack"] }
+        }
+      }
+    },
+    "sealpack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId",
+        "minSealDice",
+        "scriptPath",
+        "authors",
+        "keywords",
+        "repository",
+        "dependencies",
+        "permissions",
+        "readme",
+        "assets",
+        "store"
+      ],
+      "properties": {
+        "packageId": { "type": "string", "minLength": 3 },
+        "minSealDice": { "type": "string", "minLength": 1 },
+        "scriptPath": { "type": "string", "minLength": 1 },
+        "authors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "keywords": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "repository": { "type": "string" },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "network",
+            "networkHosts",
+            "fileRead",
+            "fileWrite",
+            "dangerous",
+            "httpServer",
+            "ipc"
+          ],
+          "properties": {
+            "network": { "type": "boolean" },
+            "networkHosts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "fileRead": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "fileWrite": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "dangerous": { "type": "boolean" },
+            "httpServer": { "type": "boolean" },
+            "ipc": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "readme": { "const": "README.md" },
+        "assets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "store": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["category", "icon", "banner", "screenshots"],
+          "properties": {
+            "category": { "type": "string", "minLength": 1 },
+            "icon": { "type": "string" },
+            "banner": { "type": "string" },
+            "screenshots": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
       }
     }
   }

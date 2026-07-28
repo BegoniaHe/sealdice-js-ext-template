@@ -4,19 +4,19 @@
 
 ## 日常命令
 
-| 命令                                           | 用途                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| `./sealw doctor [--json]`                      | 检查工具链、配置、元数据和 lockfile 状态。                                    |
-| `./sealw install [--update-lock]`              | 安装依赖。默认运行可复现的 `npm ci`；仅在有意修改依赖时使用 `--update-lock`。 |
-| `./sealw watch [--target <id>]`                | 源码变更时重建 `dev/sealdice-js-ext.js`。不会上传或重新加载脚本。             |
-| `./sealw build [--target <id>]`                | 类型检查并构建 `dist/sealdice-js-ext.js`。                                    |
-| `./sealw typecheck [--target <id>]`            | 使用一个 API profile 检查 TypeScript。                                        |
-| `./sealw test [--target <id>\|--all-targets]`  | 执行单元测试、模拟宿主测试和 bundle 冒烟测试。                                |
-| `./sealw check [--target <id>\|--all-targets]` | 执行格式化、lint、类型检查、测试和 API 产物检查。                             |
-| `./sealw fmt [--check]`                        | 格式化项目文件，或只检查格式。                                                |
-| `./sealw lint`                                 | 运行 ESLint。                                                                 |
-| `./sealw package [--target <id>]`              | 执行必要检查并创建发布文件。                                                  |
-| `./sealw clean`                                | 仅删除生成目录 `dev/`、`dist/`、`release/` 和 `.seal/cache/`。                |
+| 命令                                                            | 用途                                                                               |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `./sealw doctor [--json]`                                       | 检查工具链、配置、元数据和 lockfile 状态。                                         |
+| `./sealw install [--update-lock]`                               | 安装依赖。默认运行可复现的 `npm ci`；仅在有意修改依赖时使用 `--update-lock`。      |
+| `./sealw watch [--target <id>]`                                 | 源码变更时重建 `dev/sealdice-js-ext.js`。不会上传或重新加载脚本。                  |
+| `./sealw build [--target <id>]`                                 | 类型检查并构建 `dist/sealdice-js-ext.js`。                                         |
+| `./sealw typecheck [--target <id>]`                             | 使用一个 API profile 检查 TypeScript。                                             |
+| `./sealw test [--target <id>\|--all-targets]`                   | 执行单元测试、模拟宿主测试和 bundle 冒烟测试。                                     |
+| `./sealw check [--target <id>\|--all-targets]`                  | 执行格式化、lint、类型检查、测试和 API 产物检查。                                  |
+| `./sealw fmt [--check]`                                         | 格式化项目文件，或只检查格式。                                                     |
+| `./sealw lint`                                                  | 运行 ESLint。                                                                      |
+| `./sealw package [--format js\|sealpack\|both] [--target <id>]` | 执行检查并创建 `.js`、`.sealpack` 或两种格式；`.sealpack` 需要精确的 1.6+ target。 |
+| `./sealw clean`                                                 | 仅删除生成目录 `dev/`、`dist/`、`release/` 和 `.seal/cache/`。                     |
 
 常用 npm 别名为 `npm run dev`、`npm run build`、`npm test` 与 `npm run check`。
 

@@ -10,7 +10,10 @@ const targetIndex = process.argv.indexOf('--target');
 const target = targetIndex === -1 ? '1.5.0' : process.argv[targetIndex + 1];
 if (!target) throw new Error('--target requires a profile id');
 
-const output = outputPath('development');
+const config = JSON.parse(
+  await fs.readFile(new URL('../../seal.config.json', import.meta.url), 'utf8'),
+);
+const output = outputPath(config, 'development');
 const source = await fs.readFile(output, 'utf8');
 assert.match(source, /^\/\/ ==UserScript==\r?\n/, 'missing userscript header');
 assert.match(

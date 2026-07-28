@@ -13,6 +13,10 @@
 
 `./sealw package` 会故意拒绝模板默认 id、名称、作者和主页，避免只改了一部分信息就发布了改名副本。
 
+发布 `.sealpack` 时，还要替换 `seal.config.json` 中的 `sealpack.packageId`。它是稳定的
+`作者/包名` 商店/包身份，和 userscript `id` 有意分离。发布前检查 `minSealDice`、脚本目标路径、显式
+assets、商店信息、依赖和权限声明。
+
 ## 2. 验证所支持的 target
 
 只发布给一个精确 SealDice 版本时：
@@ -32,8 +36,22 @@
 
 ## 3. 生成发布文件
 
+旧式 JavaScript 产物对所有已注册 target 保持可用：
+
 ```sh
 ./sealw package --target compat-1.5.x
+```
+
+要生成 SealDice 1.6+ 扩展包，选择满足 `sealpack.minSealDice` 的精确 target：
+
+```sh
+./sealw package --format sealpack --target 1.6.0
+```
+
+同一精确 target 同时发布两种形式：
+
+```sh
+./sealw package --format both --target 1.6.0
 ```
 
 命令会重复必要检查，并写入：
@@ -41,11 +59,14 @@
 ```text
 release/<extension-id>-<version>.js
 release/<extension-id>-<version>.js.sha256
+release/<package-name>@<version>.sealpack
+release/<package-name>@<version>.sealpack.sha256
 release/manifest.json
 ```
 
-检查 `manifest.json`：其中的 id、版本、target profile、profile hash 和 SHA-256 必须与准备分发的文件一致。将 `.js` 上传到
-SealDice；有条件时一并发布 checksum 与 manifest。
+`manifest.json` 会列出所有选择的产物、target profile 和 profile hash。分发前逐个检查 SHA-256：`.js` 继续按旧
+JavaScript 脚本流程上传；`.sealpack` 应通过 SealDice 1.6+ 的扩展包流程上传，或发布到扩展商店。两种格式都应尽量一并发布
+checksum 与 manifest。
 
 不要分发 `dev/` 中的文件。它们是开发产物，含 source map，并且 `watch` 运行时可能继续变动。
 
@@ -54,7 +75,10 @@ SealDice；有条件时一并发布 checksum 与 manifest。
 手动触发 **Release SealDice Extension** 工作流时，需要填写：
 
 - `target`：已在 `seal.config.json` 注册的 target。
+- `format`：`js`、`sealpack` 或 `both`；`sealpack` 需要不低于
+  `sealpack.minSealDice` 的精确 target。
 - `tag`：必须精确等于 `v` 加 `extension.json` 的版本，例如 `v1.2.3`。
 - `draft`：通常保持开启，检查生成附件后再公开发布 GitHub Release。
 
-工作流会运行 `package`、为 JavaScript 产物生成 attestation，并将 bundle、checksum 和 manifest 附到 GitHub Release。
+工作流提供和 CLI 相同的 `format` 输入（`js`、`sealpack` 或 `both`）。它会运行 `package`、为生成的
+发布文件创建 attestation，并将所选产物、checksum 和 manifest 附到 GitHub Release。

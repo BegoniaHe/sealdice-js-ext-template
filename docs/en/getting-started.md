@@ -44,7 +44,25 @@ Edit `extension.json` before changing the example code.
 The default values are intentionally rejected by `./sealw package`. They are
 safe for local experiments, but cannot be released by mistake.
 
-## 3. Write the extension
+## 3. Configure the build and package
+
+`seal.config.json` is the static build configuration. It defines the bundle
+entry point and filename, registered SealDice targets, default release formats,
+and `.sealpack` metadata. It is schema-validated; `sealw` executes built-in
+tasks from this configuration and does not run arbitrary project build code.
+
+The default release format is `js`, so existing 1.5.x workflows remain
+unchanged. To publish a SealDice 1.6+ extension package, replace the template
+value in `sealpack.packageId` with a stable `author/package` id, and review its
+assets, store data, permissions, and `minSealDice`. This package id is separate
+from the lowercase userscript id in `extension.json`.
+
+The initial package task stages the production bundle at
+`sealpack.scriptPath`, the root `README.md`, and explicitly listed `assets/`
+paths. It does not claim support for package-provided decks, reply files,
+help documents, or templates yet.
+
+## 4. Write the extension
 
 The entry point is `src/index.ts`. The example:
 
@@ -56,7 +74,7 @@ Replace this command or add more command items to `extension.cmdMap`. Keep
 runtime calls inside the APIs available for the target you support; TypeScript
 will flag APIs that do not exist in that target.
 
-## 4. Build and test it in SealDice
+## 5. Build and test it in SealDice
 
 For the default compatibility target, run:
 
@@ -82,7 +100,7 @@ To make a one-off production-style bundle without watching:
 
 The output is `dist/sealdice-js-ext.js`.
 
-## 5. Choose a target
+## 6. Choose a target
 
 Run `./sealw target list` to see the registered targets. The current choices
 are:
@@ -91,13 +109,16 @@ are:
 | ------------------ | ---------------------------------------------------------------------------------- |
 | `compat-1.5.x`     | One bundle must support exactly SealDice `1.5.0` and `1.5.1`. This is the default. |
 | `1.5.0` or `1.5.1` | You only support one of those exact host versions.                                 |
-| `1.6.0`            | You use API additions from SealDice 1.6, such as grouped configuration parameters. |
+| `1.6.0`            | You use API additions from SealDice 1.6, or publish a `.sealpack` package.         |
 
 `compat-1.5.x` does not include 1.6.0. It is a deliberately named, tested set,
 not a semantic-version range. Use runtime feature detection when calling API
 members marked optional by a compatibility profile.
 
-## 6. Verify before sharing
+`.sealpack` export requires an exact target at or above `sealpack.minSealDice`.
+It is therefore intentionally unavailable for `compat-1.5.x`.
+
+## 7. Verify before sharing
 
 Run the narrow check while working on one target:
 
@@ -117,10 +138,10 @@ artifacts. It does not upload to or start a real SealDice instance.
 
 ## Common problems
 
-| Symptom                            | What to do                                                                                |
-| ---------------------------------- | ----------------------------------------------------------------------------------------- |
-| `Node.js 26.5.0 is required`       | Install and select exactly Node 26.5.0, then rerun the command.                           |
-| `Dependencies are not installed`   | Run `./sealw install`.                                                                    |
-| An API is missing in TypeScript    | Pick the correct target, or use an API available in the target you claim to support.      |
-| SealDice still runs old code       | Upload the new file and reload the script; rebuilding alone is not enough.                |
-| `package` rejects a template value | Replace every placeholder in `extension.json` and make `LICENSE` match its license value. |
+| Symptom                            | What to do                                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Node.js 26.5.0 is required`       | Install and select exactly Node 26.5.0, then rerun the command.                                                                                |
+| `Dependencies are not installed`   | Run `./sealw install`.                                                                                                                         |
+| An API is missing in TypeScript    | Pick the correct target, or use an API available in the target you claim to support.                                                           |
+| SealDice still runs old code       | Upload the new file and reload the script; rebuilding alone is not enough.                                                                     |
+| `package` rejects a template value | Replace every placeholder in `extension.json`, replace `sealpack.packageId` before package export, and make `LICENSE` match its license value. |

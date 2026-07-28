@@ -40,7 +40,19 @@ mise exec -- ./sealw install
 
 默认内容会被 `./sealw package` 故意拒绝。它们适合本地试验，但不能因忘记替换而被误发布。
 
-## 3. 编写扩展
+## 3. 配置构建与扩展包
+
+`seal.config.json` 是静态构建配置：它声明 bundle 入口和文件名、SealDice target、默认发布格式及
+`.sealpack` 元数据。配置会经过 schema 校验；`sealw` 只根据它调度内置任务，不会执行任意项目构建代码。
+
+默认发布格式是 `js`，因此原有 1.5.x 工作流不变。需要发布 SealDice 1.6+ 扩展包时，将
+`sealpack.packageId` 的模板值替换为稳定的 `作者/包名`，并检查 assets、商店信息、权限和
+`minSealDice`。这个包 ID 与 `extension.json` 的小写 userscript id 是两个不同身份。
+
+初版打包任务只会将 production bundle 放到 `sealpack.scriptPath`，并加入根目录 `README.md` 和显式声明的
+`assets/` 路径；不会假称已支持牌堆、回复、帮助文档或模板等包内资源。
+
+## 4. 编写扩展
 
 入口文件是 `src/index.ts`。示例会：
 
@@ -51,7 +63,7 @@ mise exec -- ./sealw install
 替换此命令，或继续向 `extension.cmdMap` 添加命令。只调用所选 target 中存在的 API；TypeScript 会提示当前
 target 不支持的 API。
 
-## 4. 构建并在 SealDice 中测试
+## 5. 构建并在 SealDice 中测试
 
 默认兼容 target 的持续构建命令为：
 
@@ -76,7 +88,7 @@ target 不支持的 API。
 
 产物位于 `dist/sealdice-js-ext.js`。
 
-## 5. 选择 target
+## 6. 选择 target
 
 通过 `./sealw target list` 查看已注册 target。目前可选项如下：
 
@@ -84,12 +96,14 @@ target 不支持的 API。
 | ------------------ | ---------------------------------------------------------------------- |
 | `compat-1.5.x`     | 一个 bundle 同时支持**恰好** SealDice `1.5.0` 和 `1.5.1`。这是默认值。 |
 | `1.5.0` 或 `1.5.1` | 只支持其中一个确定宿主版本。                                           |
-| `1.6.0`            | 使用了 SealDice 1.6 新增 API，例如带分组参数的配置注册。               |
+| `1.6.0`            | 使用 SealDice 1.6 新增 API，或发布 `.sealpack` 扩展包。                |
 
 `compat-1.5.x` 不包括 1.6.0。它是明确命名并经过测试的版本集合，不是语义化版本范围。兼容 profile 中标记为可选的
 API，必须在运行时进行特性检测后再调用。
 
-## 6. 分享前验证
+导出 `.sealpack` 必须选择不低于 `sealpack.minSealDice` 的精确 target，因此不能使用 `compat-1.5.x`。
+
+## 7. 分享前验证
 
 开发单一 target 时，运行较快的检查：
 
@@ -108,10 +122,10 @@ API 产物检查。它不会上传到真实 SealDice，也不会启动真实实�
 
 ## 常见问题
 
-| 现象                             | 处理方式                                                                         |
-| -------------------------------- | -------------------------------------------------------------------------------- |
-| `Node.js 26.5.0 is required`     | 安装并切换到精确的 Node 26.5.0，再重新运行命令。                                 |
-| `Dependencies are not installed` | 运行 `./sealw install`。                                                         |
-| TypeScript 提示 API 不存在       | 选择正确 target，或仅使用你声称支持的 target 中存在的 API。                      |
-| SealDice 仍在运行旧代码          | 重新上传新文件并重新加载脚本；仅重新构建不足以生效。                             |
-| `package` 拒绝模板值             | 替换 `extension.json` 的所有占位值，并让根目录 `LICENSE` 与其中的 license 一致。 |
+| 现象                             | 处理方式                                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `Node.js 26.5.0 is required`     | 安装并切换到精确的 Node 26.5.0，再重新运行命令。                                                                            |
+| `Dependencies are not installed` | 运行 `./sealw install`。                                                                                                    |
+| TypeScript 提示 API 不存在       | 选择正确 target，或仅使用你声称支持的 target 中存在的 API。                                                                 |
+| SealDice 仍在运行旧代码          | 重新上传新文件并重新加载脚本；仅重新构建不足以生效。                                                                        |
+| `package` 拒绝模板值             | 替换 `extension.json` 的所有占位值；发布扩展包时还要替换 `sealpack.packageId`，并让根目录 `LICENSE` 与其中的 license 一致。 |

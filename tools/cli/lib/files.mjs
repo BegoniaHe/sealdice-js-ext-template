@@ -46,7 +46,7 @@ export async function writeAtomic(file, content) {
     `.${path.basename(file)}.${process.pid}.${crypto.randomUUID()}.tmp`,
   );
   try {
-    await fs.writeFile(temporary, content, 'utf8');
+    await fs.writeFile(temporary, content);
     await fs.rename(temporary, file);
   } finally {
     await fs.rm(temporary, { force: true });

@@ -36,9 +36,13 @@ The manual upload step is expected.
 
 ## Concepts in one minute
 
-- **Extension metadata**: `extension.json` is the single source for the
-  extension id, displayed name, author, version, userscript header, and release
+- **JavaScript extension metadata**: `extension.json` provides the runtime id,
+  displayed name, author, version, userscript header, and `.js` release
   filename.
+- **Build and package configuration**: `seal.config.json` declares the static
+  build inputs and targets. It also contains the separate `.sealpack` package
+  identity, permissions, assets, and store data when publishing for SealDice
+  1.6+.
 - **Target**: a named SealDice API profile. It controls TypeScript declarations
   and the mock host used in tests.
 - **Compatibility target**: a finite, tested list of exact host versions. It is

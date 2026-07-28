@@ -30,7 +30,10 @@
 
 ## 一分钟理解术语
 
-- **扩展元数据**：`extension.json` 是扩展 id、显示名、作者、版本、userscript header 和发布文件名的唯一来源。
+- **JavaScript 扩展元数据**：`extension.json` 提供运行时 id、显示名、作者、版本、userscript header
+  和 `.js` 发布文件名。
+- **构建与扩展包配置**：`seal.config.json` 声明静态构建输入与 target；发布 SealDice 1.6+ 扩展包时，
+  还在此配置独立的 `.sealpack` 包身份、权限、资源和商店信息。
 - **target**：一个有名字的 SealDice API profile，决定 TypeScript 声明与测试使用的模拟宿主。
 - **兼容 target**：经过测试的一组精确宿主版本，不代表匹配该版本号形式的所有发行版都可用。
 - **API profile 维护**：供模板维护者使用的高级工作；大多数扩展作者无需扫描 SealDice core，也不需要修改 `api/`。
