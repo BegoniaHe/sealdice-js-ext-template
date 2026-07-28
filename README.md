@@ -9,7 +9,8 @@ release manifest 都由它生成。先修改它，再开始开发。
 
 ## Quick Start
 
-需要 POSIX shell（macOS/Linux）、Node `26.5.0` 与 npm `12.0.1`。Windows 不在支持范围内。
+需要 POSIX shell（macOS/Linux）、Node `26.5.0` 与 npm `12.0.1`。Windows 不受支持，
+包括 PowerShell、命令提示符、Git Bash 和 WSL。
 已安装
 [mise](https://mise.jdx.dev/) 时，下面的命令会使用仓库锁定的工具链；否则先让同版本的
 `node` 和 `npm` 出现在 `PATH` 中再直接运行 `./sealw`。
@@ -82,7 +83,8 @@ release/manifest.json
 ```
 
 手动 GitHub Actions 工作流 **Release SealDice Extension** 会重复上述检查、生成构建来源证明，
-并创建 draft 或正式 GitHub Release。详见 [`docs/releasing.md`](docs/releasing.md)。
+并创建 draft 或正式 GitHub Release。详见[中文发布指南](docs/zh/releasing.md)或
+[English release guide](docs/en/releasing.md)。
 
 ## API Profiles
 
@@ -106,7 +108,8 @@ release/manifest.json
 
 `1.6.0` 来自官方 `sealdice-build` 发布的锁定 core commit，而不是不存在的 core tag。其 release、
 source、artifact digest 和观测运行时版本均记录在 override 中。维护流程、来源约束和可选 goja
-probe 见 [`docs/api-profiles.md`](docs/api-profiles.md)。
+probe 见[中文 API profile 维护指南](docs/zh/api-profiles.md)或
+[English API profile guide](docs/en/api-profiles.md)。
 
 手动 **Refresh SealDice API Profile** 工作流会生成可下载的二进制 patch；选择创建 PR 后才会把
 变更推送到仓库。其 target 是自由文本，但 CLI 只接受已在注册表中声明的精确 profile；开始前须先
