@@ -1,0 +1,3 @@
+[submodule "reference/sealdice-core"]
+	path = reference/sealdice-core
+	url = https://github.com/sealdice/sealdice-core.git

@@ -1,11 +1,8 @@
 /**
- * Curated SealDice JavaScript plugin API declaration source for SealDice 1.5.x.
+ * SealDice JavaScript plugin API for SealDice 1.5.x.
  *
- * This file describes the supported plugin surface registered by `Dice.JsInit`
- * at the checked-in 1.5.0 and 1.5.1 API profiles.
- * Objects received from the host are Go proxies and may expose additional Go
- * methods at runtime. Those implementation details are intentionally not part
- * of this compatibility contract.
+ * Generated from api/profiles/1.5.x.json. The TypeScript
+ * semantic mapping is maintained by the checked-in profile override.
  */
 declare namespace seal {
   export type BanRankType = -30 | -10 | 0 | 30;
@@ -217,7 +214,6 @@ declare namespace seal {
   export interface ConfigItem {
     key: string;
     type: string;
-    /* __SEAL_CONFIG_ITEM_GROUP__ */
     defaultValue: unknown;
     value: unknown;
     option: unknown;
@@ -295,35 +291,30 @@ declare namespace seal {
       key: string,
       defaultValue: string,
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     registerIntConfig(
       extension: ExtInfo,
       key: string,
       defaultValue: number,
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     registerBoolConfig(
       extension: ExtInfo,
       key: string,
       defaultValue: boolean,
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     registerFloatConfig(
       extension: ExtInfo,
       key: string,
       defaultValue: number,
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     registerTemplateConfig(
       extension: ExtInfo,
       key: string,
       defaultValue: string[],
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     registerOptionConfig(
       extension: ExtInfo,
@@ -331,7 +322,6 @@ declare namespace seal {
       defaultValue: string,
       options: string[],
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): void;
     newConfigItem(
       extension: ExtInfo,
@@ -355,7 +345,6 @@ declare namespace seal {
       fn: (taskCtx: JsScriptTaskContext) => void,
       key?: string,
       description?: string,
-      /* __SEAL_CONFIG_GROUP_PARAMETER__ */
     ): JsScriptTask;
   };
 

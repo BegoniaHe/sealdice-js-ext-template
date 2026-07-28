@@ -1,0 +1,33 @@
+{
+  "entries": {},
+  "provenance": {
+    "artifact": {
+      "name": "sealdice-core_1.6.0_linux_amd64.tar.gz",
+      "sha256": "sha256:6cd37580dc35d7a1f0b5c2159a692bab1db97c119d738f4a139dd7ef5c3ea549",
+      "url": "https://github.com/sealdice/sealdice-build/releases/download/v1.6.0/sealdice-core_1.6.0_linux_amd64.tar.gz"
+    },
+    "release": {
+      "commit": "40950761aa2b1d0ecdfff050e69ddbea803cf2bf",
+      "publishedAt": "2026-07-26T16:07:20Z",
+      "repository": "https://github.com/sealdice/sealdice-build",
+      "tag": "v1.6.0"
+    },
+    "runtime": {
+      "observedVersion": "1.6.0+20260726",
+      "platform": "linux-amd64"
+    },
+    "source": {
+      "commit": "b06a2d92a7af0b8b33be33390206297edf29c7bd",
+      "declaredVersion": "1.5.1-dev",
+      "repository": "https://github.com/sealdice/sealdice-core"
+    },
+    "versionMismatch": {
+      "reason": "The official sealdice-build v1.6.0 release injects the distribution version while the locked core source still declares 1.5.1-dev.",
+      "status": "acknowledged"
+    }
+  },
+  "typeDeclarationOptions": {
+    "configGroups": true
+  },
+  "typeDeclarationSource": "types/seal.d.ts"
+}
