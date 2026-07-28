@@ -15,7 +15,12 @@
 
 发布 `.sealpack` 时，还要替换 `seal.config.json` 中的 `sealpack.packageId`。它是稳定的
 `作者/包名` 商店/包身份，和 userscript `id` 有意分离。发布前检查 `minSealDice`、脚本目标路径、显式
-assets、商店信息、依赖和权限声明。
+assets、商店信息、依赖和权限声明。`assets` 只能位于项目的 `assets/` 目录，不能把根目录 `LICENSE` 加入
+扩展包；SealDice 只接受规定的 `.sealpack` 顶层布局。
+
+发布命令还要求可用的目标 core checkout。默认使用 `reference/sealdice-core`；也可传入
+`--core /path/to/sealdice-core`。它会用同版本 core 的 `InspectArchive` 验证生成的 `.sealpack`，并在
+goja runtime 中加载 bundle。
 
 ## 2. 验证所支持的 target
 
@@ -47,6 +52,10 @@ assets、商店信息、依赖和权限声明。
 ```sh
 ./sealw package --format sealpack --target 1.6.0
 ```
+
+若你的扩展需要联网，`network: true` 且空 `networkHosts` 表示无限制网络访问，必须同时设置
+`acknowledgeUnrestrictedNetwork: true`。`networkHosts: ["*"]` 不是支持的通配符，会被模板拒绝；使用
+精确 host 或 `*.example.com`。权限会在打包时输出摘要，但应先阅读[安全指南](security.md)。
 
 同一精确 target 同时发布两种形式：
 

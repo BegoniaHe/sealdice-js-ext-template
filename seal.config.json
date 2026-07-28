@@ -7,13 +7,25 @@
     "ecmaTarget": "es6",
     "bundleFileName": "sealdice-js-ext.js"
   },
+  "runtime": {
+    "allowedGlobals": []
+  },
   "sealDice": {
     "profiles": [
-      { "id": "1.5.0", "kind": "exact" },
-      { "id": "1.5.1", "kind": "exact" },
+      {
+        "id": "1.5.0",
+        "kind": "exact",
+        "runtimeCoreCommit": "aea1014f29cd89f1adc32abbf4da26ac8f03b690"
+      },
+      {
+        "id": "1.5.1",
+        "kind": "exact",
+        "runtimeCoreCommit": "e3b6c8183966de690df77729507a71be851153a4"
+      },
       {
         "id": "1.6.0",
         "kind": "exact",
+        "runtimeCoreCommit": "b06a2d92a7af0b8b33be33390206297edf29c7bd",
         "typecheckInclude": ["tests/profiles/1.6.0/**/*.ts"]
       },
       {
@@ -40,6 +52,7 @@
     "permissions": {
       "network": false,
       "networkHosts": [],
+      "acknowledgeUnrestrictedNetwork": false,
       "fileRead": [],
       "fileWrite": [],
       "dangerous": false,

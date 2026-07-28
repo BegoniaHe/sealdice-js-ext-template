@@ -74,6 +74,10 @@ Replace this command or add more command items to `extension.cmdMap`. Keep
 runtime calls inside the APIs available for the target you support; TypeScript
 will flag APIs that do not exist in that target.
 
+The current API has no secure configuration or key store. Do not use
+`registerStringConfig`, extension storage, or source code for API keys, tokens,
+or passwords. See the [security guide](security.md) before building a networked extension.
+
 ## 5. Build and test it in SealDice
 
 For the default compatibility target, run:
@@ -135,6 +139,16 @@ Run the full check before distributing a compatibility extension:
 The full check formats, lints, typechecks every registered profile, tests mock
 hosts, executes the built bundle in a Node VM, and verifies checked-in API
 artifacts. It does not upload to or start a real SealDice instance.
+
+Before release, run the core-backed runtime verification. It loads the actual bundle through the target
+version's `Dice.JsInit` and goja event loop:
+
+```sh
+./sealw runtime test --core /path/to/sealdice-core --all-targets
+```
+
+Every exact target locks a core commit. The supplied checkout must contain it. `package` runs the same
+verification automatically.
 
 ## Common problems
 

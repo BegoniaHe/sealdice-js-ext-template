@@ -22,6 +22,11 @@ For a `.sealpack` release, also replace `sealpack.packageId` in
 Review `minSealDice`, the staged script path, explicit asset paths, store
 metadata, dependencies, and requested permissions before publishing.
 
+Assets must remain under the project `assets/` directory. Do not add the root `LICENSE` file to the extension
+package: SealDice accepts only the defined `.sealpack` top-level layout. Releases also need a matching core
+checkout. `package` defaults to `reference/sealdice-core`, accepts `--core /path/to/sealdice-core`, validates the
+archive with that core's `InspectArchive`, and loads the bundle through goja.
+
 ## 2. Verify the supported target
 
 For one exact SealDice version:
@@ -54,6 +59,10 @@ To create a SealDice 1.6+ package, select an exact target that satisfies
 ```sh
 ./sealw package --format sealpack --target 1.6.0
 ```
+
+For a networked extension, `network: true` with an empty `networkHosts` list means unrestricted network access
+and requires `acknowledgeUnrestrictedNetwork: true`. `networkHosts: ["*"]` is not a supported wildcard; use exact
+hosts or `*.example.com`. Packaging prints a permission summary. Read the [security guide](security.md) first.
 
 To distribute both forms for that exact target:
 

@@ -10,6 +10,7 @@ import {
 } from '../cli/lib/metadata.mjs';
 import { rootDirectory } from '../cli/lib/paths.mjs';
 import { tsconfigForTarget } from '../cli/lib/target.mjs';
+import { assertRuntimePolicy } from './runtime-policy.mjs';
 
 export function outputPath(config, mode) {
   return path.join(
@@ -52,6 +53,7 @@ export async function buildBundle({ config, mode = 'production', target }) {
     await build(
       await buildOptions({ config, mode, target, outfile: temporary }),
     );
+    await assertRuntimePolicy(temporary, config);
     if (mode !== 'production') {
       const source = await fs.readFile(temporary, 'utf8');
       const finalMap = `${destination}.map`;

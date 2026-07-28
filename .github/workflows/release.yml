@@ -38,12 +38,25 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v5
         with:
           node-version: 26.5.0
           cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: true
       - run: npm install --global npm@12.0.1
       - run: npm ci
+      - name: Fetch exact core revisions for runtime profiles
+        run: |
+          node -e '
+          const { sealDice } = require("./seal.config.json");
+          for (const profile of sealDice.profiles)
+            if (profile.kind === "exact") console.log(profile.runtimeCoreCommit);
+          ' | xargs git -C reference/sealdice-core fetch --no-tags --depth 1 origin
       - name: Verify release tag
         env:
           TAG: ${{ inputs.tag }}

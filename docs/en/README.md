@@ -11,6 +11,7 @@ and is intended to be replaced with your own commands.
 - **Maintainers of this template**: use [API profiles](api-profiles.md) only
   when adding or updating SealDice host versions.
 - **People publishing an extension**: follow [Releasing](releasing.md).
+- **Authors using a network or third-party API**: read the [Security guide](security.md) first.
 
 ## Supported environment
 
@@ -34,6 +35,10 @@ recommended way to install them.
 `watch` builds files locally; it does **not** upload or reload them in SealDice.
 The manual upload step is expected.
 
+The current SealDice JavaScript API has no secure configuration or extension key store. Do not put API keys,
+tokens, passwords, or other long-lived credentials in the project, ordinary extension configuration, or
+extension storage.
+
 ## Concepts in one minute
 
 - **JavaScript extension metadata**: `extension.json` provides the runtime id,
@@ -51,4 +56,5 @@ The manual upload step is expected.
   extension authors never need to scan the SealDice core or edit `api/`.
 
 The checked-in `reference/sealdice-core` submodule is not required for ordinary
-development, builds, or tests. It is only useful for API-profile maintenance.
+development, builds, or mock tests. It is also used for API-profile maintenance,
+pre-release `runtime test`, and core-backed `.sealpack` validation.

@@ -30,6 +30,10 @@ mise exec -- ./sealw watch --target compat-1.5.x
 脚本管理并重新加载脚本；核心也提供受认证的 `js/upload` 与 `js/reload` API。开发产物写入
 采用原子替换，上传时不会读到半个 bundle。
 
+> 安全限制：当前 SealDice JavaScript API 没有安全配置或密钥存储能力。不要把 API key、token、
+> 密码或其他长期凭据放进 `extension.json`、`seal.config.json`、`src/`、普通扩展配置或
+> `storageSet`。需要联网的扩展请先阅读[安全指南](docs/zh/security.md)。
+
 ## Target Policy
 
 所有可用 target 都在 [`seal.config.json`](seal.config.json) 的 `sealDice.profiles` 中声明。精确
@@ -58,6 +62,8 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 ./sealw check --target <id>|--all-targets       Run formatting, lint, typechecks and tests
 ./sealw watch --target <id>                     Rebuild dev/sealdice-js-ext.js on source changes
 ./sealw build --target <id>                     Build dist/sealdice-js-ext.js
+./sealw runtime test --core <path> --target <id>|--all-targets
+                                                   Load a bundle in the matching SealDice goja runtime
 ./sealw package --format js|sealpack|both --target <id>
                                                    Verify and create release artifacts
 ./sealw clean                                   Remove only generated directories
@@ -71,7 +77,9 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 
 ## Release
 
-`package` 会拒绝模板默认身份、执行完整目标检查并生成 production bundle。默认格式是 `.js`，
+`package` 会拒绝模板默认身份、执行完整目标检查、静态 runtime policy 和真实 goja runtime 验证，
+并生成 production bundle。它需要与所选 target 匹配的 SealDice core checkout；默认使用
+`reference/sealdice-core`，也可通过 `--core <path>` 或 `SEAL_CORE_DIR` 指定。默认格式是 `.js`，
 因此旧版 1.5.x 发布流程不变；`.sealpack` 只能使用满足 `sealpack.minSealDice` 的精确 target
 （模板默认是 `1.6.0`）。
 
@@ -110,8 +118,9 @@ release/manifest.json
 
 ### Adding a SealDice version
 
-1. 在 `seal.config.json` 的 `profiles` 添加一个 `kind: "exact"` 的规范 SemVer id；若该版本有
-   特有 TypeScript 合约测试，用 `typecheckInclude` 声明其位于 `src/` 或 `tests/` 下的 glob。
+1. 在 `seal.config.json` 的 `profiles` 添加一个 `kind: "exact"` 的规范 SemVer id，并填写与该
+   target 一致的 `runtimeCoreCommit`；若该版本有特有 TypeScript 合约测试，用 `typecheckInclude`
+   声明其位于 `src/` 或 `tests/` 下的 glob。
 2. 创建 `api/overrides/<version>.json`，先记录发行版 provenance，再运行
    `./sealw api update --core <path> --target <version>`。
 3. 需要单 bundle 兼容时，在一个 `kind: "compatibility"` profile 的 `members` 中加入它。只有所有
@@ -133,5 +142,6 @@ probe 见[中文 API profile 维护指南](docs/zh/api-profiles.md)或
 
 ## CI
 
-常规 CI 在 `npm ci` 后离线运行 `./sealw check --all-targets`。它不拉取或编译 SealDice core；
-profile 刷新与发布均为人工触发的单独工作流。
+常规 CI 在 `npm ci` 后离线运行 `./sealw check --all-targets`。profile 刷新与发布均为人工触发的
+单独工作流。核心 runtime CI 会额外检出每个精确 target 对应的 source commit，并通过 `Dice.JsInit`
+加载真实 bundle。

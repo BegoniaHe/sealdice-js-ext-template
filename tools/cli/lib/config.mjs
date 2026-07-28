@@ -124,6 +124,29 @@ function validateSealpackConfig(config) {
   for (const packageID of sealpack.permissions.ipc)
     if (packageID !== '*')
       assertPackageID(packageID, 'sealpack.permissions.ipc entry');
+
+  const { acknowledgeUnrestrictedNetwork, network, networkHosts } =
+    sealpack.permissions;
+  assert(
+    !networkHosts.includes('*'),
+    'sealpack.permissions.networkHosts does not support *; use explicit hosts or an acknowledged empty allowlist',
+  );
+  if (!network) {
+    assert(
+      networkHosts.length === 0,
+      'sealpack.permissions.networkHosts must be empty when network is false',
+    );
+    assert(
+      !acknowledgeUnrestrictedNetwork,
+      'sealpack.permissions.acknowledgeUnrestrictedNetwork requires network to be true',
+    );
+  }
+  if (network && networkHosts.length === 0) {
+    assert(
+      acknowledgeUnrestrictedNetwork,
+      'unrestricted network access requires acknowledgeUnrestrictedNetwork: true',
+    );
+  }
 }
 
 export async function validateConfig(config) {
@@ -150,6 +173,10 @@ export async function validateConfig(config) {
     ids.add(profile.id);
     if (profile.kind !== 'exact') continue;
     assertCanonicalVersion(profile.id, `Exact profile id ${profile.id}`);
+    assert(
+      /^[0-9a-f]{40}$/.test(profile.runtimeCoreCommit),
+      `Exact profile ${profile.id} requires a 40-character runtimeCoreCommit`,
+    );
     for (const file of profile.typecheckInclude ?? [])
       assertSafeTypecheckPath(file);
     exact.set(profile.id, profile);

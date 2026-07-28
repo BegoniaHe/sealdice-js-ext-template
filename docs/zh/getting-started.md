@@ -63,6 +63,9 @@ mise exec -- ./sealw install
 替换此命令，或继续向 `extension.cmdMap` 添加命令。只调用所选 target 中存在的 API；TypeScript 会提示当前
 target 不支持的 API。
 
+当前 API 不提供安全配置或密钥存储。不要使用 `registerStringConfig`、扩展 storage 或源码保存 API key、
+token 或密码；联网扩展的限制和权限语义见[安全指南](security.md)。
+
 ## 5. 构建并在 SealDice 中测试
 
 默认兼容 target 的持续构建命令为：
@@ -119,6 +122,15 @@ API，必须在运行时进行特性检测后再调用。
 
 完整检查会执行格式化检查、lint、每个 profile 的类型检查、模拟宿主测试、Node VM 中的 bundle 冒烟测试，以及已提交
 API 产物检查。它不会上传到真实 SealDice，也不会启动真实实例。
+
+在发布前还必须运行 core-backed runtime 验证。它使用目标版本的 `Dice.JsInit` 和 goja event loop 加载
+实际 bundle：
+
+```sh
+./sealw runtime test --core /path/to/sealdice-core --all-targets
+```
+
+每个精确 target 都锁定了一个 core commit；传入的 checkout 必须包含它。`package` 会自动执行同一验证。
 
 ## 常见问题
 

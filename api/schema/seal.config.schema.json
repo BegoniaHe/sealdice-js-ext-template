@@ -8,6 +8,7 @@
     "schemaVersion",
     "packageManager",
     "build",
+    "runtime",
     "sealDice",
     "release",
     "sealpack"
@@ -29,6 +30,18 @@
         }
       }
     },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedGlobals"],
+      "properties": {
+        "allowedGlobals": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "sealDice": {
       "type": "object",
       "additionalProperties": false,
@@ -42,13 +55,17 @@
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "kind"],
+                "required": ["id", "kind", "runtimeCoreCommit"],
                 "properties": {
                   "id": {
                     "type": "string",
                     "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
                   },
                   "kind": { "const": "exact" },
+                  "runtimeCoreCommit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
                   "typecheckInclude": {
                     "type": "array",
                     "uniqueItems": true,
@@ -139,6 +156,7 @@
           "required": [
             "network",
             "networkHosts",
+            "acknowledgeUnrestrictedNetwork",
             "fileRead",
             "fileWrite",
             "dangerous",
@@ -152,6 +170,7 @@
               "uniqueItems": true,
               "items": { "type": "string", "minLength": 1 }
             },
+            "acknowledgeUnrestrictedNetwork": { "type": "boolean" },
             "fileRead": {
               "type": "array",
               "uniqueItems": true,

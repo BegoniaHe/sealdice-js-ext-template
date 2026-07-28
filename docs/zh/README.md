@@ -8,6 +8,7 @@
 - **扩展作者**：先阅读[快速开始](getting-started.md)，开发时查阅[命令参考](commands.md)。
 - **模板维护者**：只有新增或更新 SealDice 宿主版本时，才需要阅读 [API profile 维护](api-profiles.md)。
 - **准备发布扩展的人**：阅读[发布扩展](releasing.md)。
+- **需要网络或第三方 API 的作者**：先阅读[安全指南](security.md)。
 
 ## 支持的环境
 
@@ -28,6 +29,9 @@
 
 `watch` 只在本地构建，**不会**自动上传到 SealDice，也不会自动重新加载脚本。手动上传是当前工作流的一部分。
 
+当前 SealDice JavaScript API 没有安全配置或密钥存储能力。不要把 API key、token、密码等长期
+凭据写进项目、普通扩展配置或扩展 storage；这不是可接受的临时方案。
+
 ## 一分钟理解术语
 
 - **JavaScript 扩展元数据**：`extension.json` 提供运行时 id、显示名、作者、版本、userscript header
@@ -38,4 +42,5 @@
 - **兼容 target**：经过测试的一组精确宿主版本，不代表匹配该版本号形式的所有发行版都可用。
 - **API profile 维护**：供模板维护者使用的高级工作；大多数扩展作者无需扫描 SealDice core，也不需要修改 `api/`。
 
-日常开发、构建和测试不需要已检出的 `reference/sealdice-core` 子模块；它只在维护 API profile 时有用。
+日常开发、构建和 mock 测试不需要已检出的 `reference/sealdice-core` 子模块。它也用于 API profile
+维护，以及发布前的 `runtime test` 和 `.sealpack` core 校验。

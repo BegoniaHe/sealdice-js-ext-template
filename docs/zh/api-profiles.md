@@ -18,7 +18,7 @@ target，绝不是自动的 SemVer 范围。
 
 ## 新增或刷新精确版本
 
-1. 在 `seal.config.json` 添加 `kind: "exact"` 条目。
+1. 在 `seal.config.json` 添加 `kind: "exact"` 条目，并填写对应源码提交的 `runtimeCoreCommit`。
 2. 获取与目标 SealDice core commit 精确对应且干净的 checkout 或源码归档。
 3. 创建 `api/overrides/<target>.json`，并在更新前记录 release、source、artifact 与 runtime provenance。
 4. 先无写入地检查源码：

@@ -34,6 +34,11 @@ import {
   stageSealpack,
 } from '../tasks/sealpack.mjs';
 import {
+  inspectSealpackArchive,
+  resolveRuntimeCore,
+  verifyBundleRuntime,
+} from '../runtime/core.mjs';
+import {
   releaseJavaScriptArtifact,
   writeArtifactChecksums,
   writeReleaseManifest,
@@ -58,6 +63,8 @@ Core commands:
   build [--target <id>]        Build dist artifact
   package [--format <format>] [--target <id>]
                                Verify then produce js, sealpack, or both release artifacts
+  runtime test [--core <path>] [--target <id>|--all-targets]
+                               Load the bundle in the matching SealDice goja runtime
   clean                        Remove known generated outputs only
 
 Dependency commands:
@@ -217,7 +224,47 @@ function packageFormats(config, argumentsList) {
   throw new CliError('--format requires js, sealpack, or both');
 }
 
-async function packageArtifacts(config, target, formats) {
+function writeSealpackPermissionSummary(config) {
+  const permissions = config.sealpack.permissions;
+  if (!permissions.network) {
+    process.stdout.write('Sealpack network permission: disabled.\n');
+    return;
+  }
+  if (permissions.networkHosts.length === 0) {
+    process.stdout.write(
+      'Sealpack network permission: UNRESTRICTED (explicitly acknowledged).\n',
+    );
+    return;
+  }
+  process.stdout.write(
+    `Sealpack network permission: ${permissions.networkHosts.join(', ')}.\n`,
+  );
+}
+
+async function runtimeTest(config, argumentsList) {
+  const allTargets = argumentsList.includes('--all-targets');
+  assert(
+    !(allTargets && targetFromArguments(argumentsList)),
+    'runtime test --all-targets cannot be combined with --target',
+  );
+  const core = await resolveRuntimeCore(argumentsList);
+  const targets = allTargets
+    ? exactTargets(config)
+    : [resolveTarget(config, argumentsList)];
+  const extension = await loadExtensionMetadata();
+  for (const target of targets) {
+    const bundlePath = await build(config, target, 'development');
+    await verifyBundleRuntime({
+      bundlePath,
+      config,
+      core,
+      extensionID: extension.id,
+      target,
+    });
+  }
+}
+
+async function packageArtifacts(config, target, formats, argumentsList) {
   const profile = profileForTarget(config, target);
   const releaseDirectory = fromRoot(config.release.directory);
   if (formats.includes('sealpack')) {
@@ -229,8 +276,16 @@ async function packageArtifacts(config, target, formats) {
   const extension = await loadExtensionMetadata({ release: true });
   if (formats.includes('sealpack'))
     assertSealpackTarget(config, extension, target);
+  const core = await resolveRuntimeCore(argumentsList);
+  if (config.runtime.allowedGlobals.length)
+    process.stdout.write(
+      `Reviewed runtime global exceptions: ${config.runtime.allowedGlobals.join(', ')}.\n`,
+    );
+  if (formats.includes('sealpack')) writeSealpackPermissionSummary(config);
 
-  const packageTaskNames = formats.map((format) => `package:${format}`);
+  const packageTaskNames = formats.map((format) =>
+    format === 'sealpack' ? 'inspect:sealpack' : `package:${format}`,
+  );
   const tasks = {
     verify: {
       run: () =>
@@ -245,8 +300,19 @@ async function packageArtifacts(config, target, formats) {
       dependencies: ['verify'],
       run: () => buildBundle({ config, mode: 'production', target }),
     },
-    'package:js': {
+    runtime: {
       dependencies: ['bundle'],
+      run: ({ results }) =>
+        verifyBundleRuntime({
+          bundlePath: results.get('bundle'),
+          config,
+          core,
+          extensionID: extension.id,
+          target,
+        }),
+    },
+    'package:js': {
+      dependencies: ['runtime'],
       run: ({ results }) =>
         releaseJavaScriptArtifact({
           bundlePath: results.get('bundle'),
@@ -255,7 +321,7 @@ async function packageArtifacts(config, target, formats) {
         }),
     },
     'stage:sealpack': {
-      dependencies: ['bundle'],
+      dependencies: ['runtime'],
       run: ({ results }) =>
         stageSealpack({
           bundlePath: results.get('bundle'),
@@ -272,6 +338,26 @@ async function packageArtifacts(config, target, formats) {
           releaseDirectory,
           stage: results.get('stage:sealpack'),
         }),
+    },
+    'inspect:sealpack': {
+      dependencies: ['package:sealpack'],
+      run: async ({ results }) => {
+        const archivePath = path.join(
+          releaseDirectory,
+          results.get('package:sealpack').artifact,
+        );
+        try {
+          await inspectSealpackArchive({
+            archivePath,
+            config,
+            core,
+            target,
+          });
+        } catch (error) {
+          await fs.rm(archivePath, { force: true });
+          throw error;
+        }
+      },
     },
     manifest: {
       dependencies: packageTaskNames,
@@ -390,6 +476,12 @@ async function main() {
     return typecheck(config, resolveTarget(config, argumentsList));
   if (command === 'test') return test(config, argumentsList);
   if (command === 'check') return check(config, argumentsList);
+  if (command === 'runtime') {
+    const [action = 'test', ...runtimeArguments] = argumentsList;
+    if (action !== 'test')
+      throw new CliError('runtime only supports the test action');
+    return runtimeTest(config, runtimeArguments);
+  }
   if (command === 'build')
     return build(config, resolveTarget(config, argumentsList));
   if (command === 'watch') {
@@ -402,6 +494,7 @@ async function main() {
       config,
       resolveTarget(config, argumentsList),
       packageFormats(config, argumentsList),
+      argumentsList,
     );
   if (command === 'clean') {
     assert(

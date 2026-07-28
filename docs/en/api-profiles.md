@@ -22,7 +22,7 @@ optional. Extension code must feature-detect optional APIs at runtime.
 
 ## Add or refresh an exact version
 
-1. Add a new `kind: "exact"` entry to `seal.config.json`.
+1. Add a new `kind: "exact"` entry to `seal.config.json`, including the matching source commit as `runtimeCoreCommit`.
 2. Obtain a clean checkout or source archive for the exact SealDice core commit.
 3. Create `api/overrides/<target>.json` and record the release, source,
    artifact, and runtime provenance before updating.

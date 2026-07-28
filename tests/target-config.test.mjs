@@ -21,6 +21,7 @@ function config(profiles, defaultTarget = profiles[0].id) {
       defaultFormats: ['js'],
       directory: 'release',
     },
+    runtime: { allowedGlobals: [] },
     schemaVersion: 3,
     sealDice: { defaultTarget, profiles },
     sealpack: {
@@ -36,6 +37,7 @@ function config(profiles, defaultTarget = profiles[0].id) {
         fileWrite: [],
         httpServer: false,
         ipc: [],
+        acknowledgeUnrestrictedNetwork: false,
         network: false,
         networkHosts: [],
       },
@@ -47,12 +49,20 @@ function config(profiles, defaultTarget = profiles[0].id) {
   };
 }
 
+function exact(id, suffix) {
+  return {
+    id,
+    kind: 'exact',
+    runtimeCoreCommit: `${suffix}`.padEnd(40, '0'),
+  };
+}
+
 test('target registry accepts a future semantic-version profile without code changes', async () => {
   const value = await validateConfig(
     config(
       [
-        { id: '1.6.0', kind: 'exact' },
-        { id: '1.6.1', kind: 'exact' },
+        exact('1.6.0', 'a'),
+        exact('1.6.1', 'b'),
         {
           id: 'compat-1.6.x',
           kind: 'compatibility',
@@ -71,7 +81,7 @@ test('target registry rejects unregistered or unordered compatibility members', 
   await assert.rejects(() =>
     validateConfig(
       config([
-        { id: '1.7.0', kind: 'exact' },
+        exact('1.7.0', 'c'),
         {
           id: 'compat-1.7.x',
           kind: 'compatibility',
@@ -80,4 +90,22 @@ test('target registry rejects unregistered or unordered compatibility members', 
       ]),
     ),
   );
+});
+
+test('unrestricted network access requires explicit acknowledgement', async () => {
+  const value = config([exact('1.6.0', 'd')]);
+  value.sealpack.permissions.network = true;
+  await assert.rejects(() => validateConfig(value), /acknowledge/);
+
+  value.sealpack.permissions.acknowledgeUnrestrictedNetwork = true;
+  await assert.doesNotReject(() => validateConfig(value));
+
+  value.sealpack.permissions.networkHosts = ['*'];
+  await assert.rejects(() => validateConfig(value), /does not support \*/);
+});
+
+test('sealpack assets cannot create unsupported archive root entries', async () => {
+  const value = config([exact('1.6.0', 'e')]);
+  value.sealpack.assets = ['LICENSE'];
+  await assert.rejects(() => validateConfig(value), /stay under assets/);
 });
