@@ -21,7 +21,7 @@ export function outputPath(mode) {
   );
 }
 
-async function buildOptions({ mode, target, outfile }) {
+async function buildOptions({ config, mode, target, outfile }) {
   const header = renderUserscriptHeader(await loadExtensionMetadata());
   const isProduction = mode === 'production';
   return {
@@ -37,11 +37,11 @@ async function buildOptions({ mode, target, outfile }) {
     sourcemap: isProduction ? false : 'external',
     target: 'es6',
     treeShaking: true,
-    tsconfig: path.join(rootDirectory, tsconfigForTarget(target)),
+    tsconfig: await tsconfigForTarget(config, target),
   };
 }
 
-export async function buildBundle({ mode = 'production', target = '1.5.0' }) {
+export async function buildBundle({ config, mode = 'production', target }) {
   const destination = outputPath(mode);
   const directory = path.dirname(destination);
   await fs.mkdir(directory, { recursive: true });
@@ -51,7 +51,9 @@ export async function buildBundle({ mode = 'production', target = '1.5.0' }) {
   );
   const temporaryMap = `${temporary}.map`;
   try {
-    await build(await buildOptions({ mode, target, outfile: temporary }));
+    await build(
+      await buildOptions({ config, mode, target, outfile: temporary }),
+    );
     if (mode !== 'production') {
       const source = await fs.readFile(temporary, 'utf8');
       const finalMap = `${destination}.map`;
@@ -70,11 +72,11 @@ export async function buildBundle({ mode = 'production', target = '1.5.0' }) {
   return destination;
 }
 
-export async function watchBundle({ target = '1.5.0' }) {
+export async function watchBundle({ config, target }) {
   const outfile = outputPath('development');
   await fs.mkdir(path.dirname(outfile), { recursive: true });
   const buildContext = await context(
-    await buildOptions({ mode: 'development', target, outfile }),
+    await buildOptions({ config, mode: 'development', target, outfile }),
   );
   await buildContext.watch();
   process.stdout.write(`Watching ${path.relative(rootDirectory, outfile)}\n`);

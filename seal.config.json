@@ -1,12 +1,23 @@
 {
   "$schema": "./api/schema/seal.config.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "packageManager": "npm",
   "sealDice": {
-    "targets": ["1.5.0", "1.5.1", "1.6.0"],
-    "defaultTarget": "1.5.0",
-    "compatibilityProfile": "compat-1.5.x",
-    "compatibilityTargets": ["1.5.0", "1.5.1"]
+    "profiles": [
+      { "id": "1.5.0", "kind": "exact" },
+      { "id": "1.5.1", "kind": "exact" },
+      {
+        "id": "1.6.0",
+        "kind": "exact",
+        "typecheckInclude": ["tests/profiles/1.6.0/**/*.ts"]
+      },
+      {
+        "id": "compat-1.5.x",
+        "kind": "compatibility",
+        "members": ["1.5.0", "1.5.1"]
+      }
+    ],
+    "defaultTarget": "compat-1.5.x"
   },
   "release": {
     "directory": "release",

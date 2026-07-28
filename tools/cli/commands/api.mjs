@@ -16,7 +16,13 @@ import {
   typeProfileDirectory,
 } from '../lib/paths.mjs';
 import { run } from '../lib/process.mjs';
-import { compatibilityTarget, resolveTarget } from '../lib/target.mjs';
+import {
+  compatibilityProfiles,
+  exactTargets,
+  profileForTarget,
+  profileTargets,
+  resolveTarget,
+} from '../lib/target.mjs';
 import {
   equalEntries,
   makeCompatibilityProfile,
@@ -35,7 +41,7 @@ function optionValue(argumentsList, option) {
 }
 
 function assertExactTarget(target, config) {
-  if (!config.sealDice.targets.includes(target)) {
+  if (profileForTarget(config, target).kind !== 'exact') {
     throw new CliError(
       `API updates require an exact configured target: ${target}`,
     );
@@ -191,18 +197,21 @@ async function generateOne(target, check) {
   await writeOrCheck(await generatedOutputs(target, profile), check);
 }
 
-async function generateCompatibility(check, config) {
-  const [firstTarget, secondTarget] = config.sealDice.compatibilityTargets;
-  const first = await loadProfile(firstTarget);
-  const second = await loadProfile(secondTarget);
-  const override = await loadOverride(compatibilityTarget);
+async function generateCompatibility(compatibility, check) {
+  const profiles = await Promise.all(
+    compatibility.members.map((target) => loadProfile(target)),
+  );
+  const override = await loadOverride(compatibility.id);
   let profile;
   try {
-    profile = makeCompatibilityProfile(first, second, override);
+    profile = makeCompatibilityProfile(profiles, {
+      ...override,
+      id: compatibility.id,
+    });
   } catch (error) {
     throw new CliError(error.message, 4);
   }
-  const profileFile = profilePath(compatibilityTarget);
+  const profileFile = profilePath(compatibility.id);
   if (check) {
     if (!(await fileContentsEqual(profileFile, stableJson(profile)))) {
       throw new CliError(
@@ -213,10 +222,7 @@ async function generateCompatibility(check, config) {
   } else {
     await writeJsonAtomic(profileFile, profile);
   }
-  await writeOrCheck(
-    await generatedOutputs(compatibilityTarget, profile),
-    check,
-  );
+  await writeOrCheck(await generatedOutputs(compatibility.id, profile), check);
 }
 
 async function generate(argumentsList, config) {
@@ -224,13 +230,15 @@ async function generate(argumentsList, config) {
   const allTargets = argumentsList.includes('--all-targets');
   const target = allTargets ? null : resolveTarget(config, argumentsList);
   if (allTargets) {
-    for (const exactTarget of config.sealDice.targets)
+    for (const exactTarget of exactTargets(config))
       await generateOne(exactTarget, check);
-    await generateCompatibility(check, config);
+    for (const compatibility of compatibilityProfiles(config))
+      await generateCompatibility(compatibility, check);
     return;
   }
-  if (target === compatibilityTarget)
-    return generateCompatibility(check, config);
+  const selected = profileForTarget(config, target);
+  if (selected.kind === 'compatibility')
+    return generateCompatibility(selected, check);
   await generateOne(target, check);
 }
 
@@ -262,7 +270,9 @@ async function verify(core, target, argumentsList) {
   process.stdout.write(`API profile ${target} matches ${core}.\n`);
 }
 
-async function diffProfiles(from, to) {
+async function diffProfiles(from, to, config) {
+  profileForTarget(config, from);
+  profileForTarget(config, to);
   const first = await loadProfile(from);
   const second = await loadProfile(to);
   const firstEntries = new Map(
@@ -290,7 +300,7 @@ async function check(json, config) {
   await generate(['--all-targets', '--check'], config);
   const result = {
     ok: true,
-    profiles: [...config.sealDice.targets, compatibilityTarget],
+    profiles: profileTargets(config),
   };
   process.stdout.write(
     json
@@ -302,10 +312,7 @@ async function check(json, config) {
 export async function commandApi(argumentsList, config) {
   const [action = 'list', ...rest] = argumentsList;
   if (action === 'list') {
-    for (const target of [
-      ...config.sealDice.targets,
-      config.sealDice.compatibilityProfile,
-    ]) {
+    for (const target of profileTargets(config)) {
       const profile = await loadProfile(target);
       process.stdout.write(
         `${target}\t${profile.core.commit ?? profile.core.commits?.join(',')}\n`,
@@ -347,7 +354,7 @@ export async function commandApi(argumentsList, config) {
     const to = optionValue(rest, '--to');
     if (!from || !to)
       throw new CliError('api diff requires --from <id> --to <id>');
-    return diffProfiles(from, to);
+    return diffProfiles(from, to, config);
   }
   if (action === 'check') return check(rest.includes('--json'), config);
   if (action === 'probe') {

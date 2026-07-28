@@ -1,6 +1,6 @@
-# SealDice 1.5.x API Profile
+# SealDice compat-1.5.x API Profile
 
-- Profile hash: `sha256:725cbf07a562f94b38d9651088493c9f3cd5dda4a5a7efb4f8c1be512d317da9`
+- Profile hash: `sha256:e223a22198f24de48f1258f1b843b9dda685448b594f63fa144d7bd2506b80d3`
 - Core commit: `aea1014f29cd89f1adc32abbf4da26ac8f03b690, e3b6c8183966de690df77729507a71be851153a4`
 - Source fingerprint: `sha256:34800208fe482e34ef72b3e612b9045a341b481b11e34b901cb0aa4d110b70c1, sha256:9fab32aece81085c4ab74ed65b0be1f87c2c1c5f22463636acce73757acd9930`
 

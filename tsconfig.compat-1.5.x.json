@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "include": [
-    "src/**/*.ts",
-    "tests/seal-api-contract.ts",
-    "types/profiles/compat-1.5.x/seal.d.ts"
-  ]
-}

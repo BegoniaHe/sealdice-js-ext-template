@@ -1,13 +1,30 @@
 import { CliError } from './errors.mjs';
+import { writeJsonAtomic } from './files.mjs';
+import { fromRoot } from './paths.mjs';
 
-export const compatibilityTarget = 'compat-1.5.x';
+export function profileTargets(config) {
+  return config.sealDice.profiles.map((profile) => profile.id);
+}
 
-const profileTsconfigs = new Map([
-  ['1.5.0', 'tsconfig.seal1.5.0.json'],
-  ['1.5.1', 'tsconfig.seal1.5.1.json'],
-  ['1.6.0', 'tsconfig.seal1.6.0.json'],
-  [compatibilityTarget, 'tsconfig.compat-1.5.x.json'],
-]);
+export function exactTargets(config) {
+  return config.sealDice.profiles
+    .filter((profile) => profile.kind === 'exact')
+    .map((profile) => profile.id);
+}
+
+export function compatibilityProfiles(config) {
+  return config.sealDice.profiles.filter(
+    (profile) => profile.kind === 'compatibility',
+  );
+}
+
+export function profileForTarget(config, target) {
+  const profile = config.sealDice.profiles.find(
+    (candidate) => candidate.id === target,
+  );
+  if (!profile) throw new CliError(`Unknown SealDice target: ${target}`);
+  return profile;
+}
 
 export function targetFromArguments(argumentsList) {
   const index = argumentsList.indexOf('--target');
@@ -30,18 +47,26 @@ export function resolveTarget(
     targetFromArguments(argumentsList) ??
     process.env.SEAL_TARGET ??
     config.sealDice.defaultTarget;
-  const allowed = new Set(config.sealDice.targets);
-  if (allowCompatibility) {
-    allowed.add(config.sealDice.compatibilityProfile);
-  }
-  if (!allowed.has(target)) {
-    throw new CliError(`Unknown SealDice target: ${target}`);
-  }
+  const profile = profileForTarget(config, target);
+  if (!allowCompatibility && profile.kind !== 'exact')
+    throw new CliError(
+      `An exact SealDice target is required, received: ${target}`,
+    );
   return target;
 }
 
-export function tsconfigForTarget(target) {
-  const tsconfig = profileTsconfigs.get(target);
-  if (tsconfig) return tsconfig;
-  throw new CliError(`No TypeScript profile for target: ${target}`);
+export async function tsconfigForTarget(config, target) {
+  const profile = profileForTarget(config, target);
+  const include = [
+    '../../src/**/*.ts',
+    '../../tests/seal-api-contract.ts',
+    `../../types/profiles/${profile.id}/seal.d.ts`,
+    ...(profile.typecheckInclude ?? []).map((file) => `../../${file}`),
+  ];
+  const file = fromRoot('.seal', 'cache', `tsconfig.${profile.id}.json`);
+  await writeJsonAtomic(file, {
+    extends: '../../tsconfig.base.json',
+    include,
+  });
+  return file;
 }

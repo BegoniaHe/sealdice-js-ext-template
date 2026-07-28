@@ -92,44 +92,62 @@ export function validateProfileProvenance(profile) {
   }
 }
 
-export function makeCompatibilityProfile(first, second, options = {}) {
-  const firstEntries = entryMap(first);
-  const secondEntries = entryMap(second);
-  const paths = new Set([...firstEntries.keys(), ...secondEntries.keys()]);
+export function makeCompatibilityProfile(profiles, options = {}) {
+  if (!Array.isArray(profiles) || profiles.length < 2)
+    throw new Error(
+      'A compatibility profile requires at least two exact profiles',
+    );
+  if (!options.id) throw new Error('A compatibility profile requires an id');
+  const entriesByProfile = profiles.map(entryMap);
+  const paths = new Set(
+    entriesByProfile.flatMap((entries) => [...entries.keys()]),
+  );
   const entries = [];
   const allowed = new Set(options.allowIncompatiblePaths ?? []);
   for (const memberPath of [...paths].sort()) {
-    const oldEntry = firstEntries.get(memberPath);
-    const newEntry = secondEntries.get(memberPath);
-    if (!oldEntry || !newEntry) {
-      entries.push({ ...(oldEntry ?? newEntry), optional: true });
-      continue;
-    }
-    if (!equalEntries(oldEntry, newEntry) && !allowed.has(memberPath)) {
+    const candidates = entriesByProfile
+      .map((entries) => entries.get(memberPath))
+      .filter(Boolean);
+    const [first] = candidates;
+    if (!first) continue;
+    if (
+      candidates.some((candidate) => !equalEntries(first, candidate)) &&
+      !allowed.has(memberPath)
+    ) {
       throw new Error(
         `Incompatible API entry ${memberPath}; add an explicit compat override before generating a single bundle`,
       );
     }
-    entries.push(oldEntry);
+    entries.push({
+      ...first,
+      ...(candidates.length === profiles.length ? {} : { optional: true }),
+    });
   }
+  const typeDeclarationSource = profiles[0].typeDeclarationSource;
+  if (
+    profiles.some(
+      (profile) => profile.typeDeclarationSource !== typeDeclarationSource,
+    )
+  )
+    throw new Error(
+      'Compatibility profiles must use the same declaration source',
+    );
   return {
     compatibility: {
-      first: first.sealDiceVersion,
-      second: second.sealDiceVersion,
+      members: profiles.map((profile) => profile.sealDiceVersion),
       mode: 'intersection-with-optional-additions',
     },
     core: {
-      commits: [first.core.commit, second.core.commit],
-      sourceFingerprints: [
-        first.core.sourceFingerprint,
-        second.core.sourceFingerprint,
-      ],
+      commits: profiles.map((profile) => profile.core.commit),
+      sourceFingerprints: profiles.map(
+        (profile) => profile.core.sourceFingerprint,
+      ),
     },
     entries,
     profileVersion: 1,
-    sealDiceVersion: '1.5.x',
-    typeDeclarationSource: first.typeDeclarationSource,
-    types: first.types,
+    sealDiceVersion: options.id,
+    typeDeclarationSource,
+    types: profiles[0].types,
   };
 }
 

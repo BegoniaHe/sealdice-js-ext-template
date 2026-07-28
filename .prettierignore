@@ -1,6 +1,7 @@
 reference
 node_modules
 api/discovered
+api/profiles
 build
 coverage
 .dev

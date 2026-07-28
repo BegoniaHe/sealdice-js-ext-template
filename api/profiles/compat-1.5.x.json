@@ -1,8 +1,10 @@
 {
   "compatibility": {
-    "first": "1.5.0",
-    "mode": "intersection-with-optional-additions",
-    "second": "1.5.1"
+    "members": [
+      "1.5.0",
+      "1.5.1"
+    ],
+    "mode": "intersection-with-optional-additions"
   },
   "core": {
     "commits": [
@@ -473,7 +475,7 @@
     }
   ],
   "profileVersion": 1,
-  "sealDiceVersion": "1.5.x",
+  "sealDiceVersion": "compat-1.5.x",
   "typeDeclarationSource": "types/seal.d.ts",
   "types": {
     "AddDiscordEcho": {

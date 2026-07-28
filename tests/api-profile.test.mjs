@@ -15,13 +15,19 @@ const first = {
   types: {},
 };
 
-test('compatibility profile makes later-only members optional', () => {
-  const profile = makeCompatibilityProfile(first, {
-    ...first,
-    core: { commit: 'second', sourceFingerprint: 'sha256:second' },
-    entries: [...first.entries, { kind: 'function', path: 'seal.new' }],
-    sealDiceVersion: '1.5.1',
-  });
+test('compatibility profile makes members absent from any host optional', () => {
+  const profile = makeCompatibilityProfile(
+    [
+      first,
+      {
+        ...first,
+        core: { commit: 'second', sourceFingerprint: 'sha256:second' },
+        entries: [...first.entries, { kind: 'function', path: 'seal.new' }],
+        sealDiceVersion: '1.5.1',
+      },
+    ],
+    { id: 'compat-1.5.x' },
+  );
   assert.equal(
     profile.entries.find((entry) => entry.path === 'seal.new').optional,
     true,
@@ -30,11 +36,42 @@ test('compatibility profile makes later-only members optional', () => {
 
 test('compatibility profile rejects silent signature changes', () => {
   assert.throws(() =>
-    makeCompatibilityProfile(first, {
-      ...first,
-      entries: [{ arity: 1, kind: 'function', path: 'seal.old' }],
-      sealDiceVersion: '1.5.1',
-    }),
+    makeCompatibilityProfile(
+      [
+        first,
+        {
+          ...first,
+          entries: [{ arity: 1, kind: 'function', path: 'seal.old' }],
+          sealDiceVersion: '1.5.1',
+        },
+      ],
+      { id: 'compat-1.5.x' },
+    ),
+  );
+});
+
+test('compatibility profiles support more than two exact hosts', () => {
+  const profile = makeCompatibilityProfile(
+    [
+      first,
+      {
+        ...first,
+        core: { commit: 'second', sourceFingerprint: 'sha256:second' },
+        sealDiceVersion: '1.5.1',
+      },
+      {
+        ...first,
+        core: { commit: 'third', sourceFingerprint: 'sha256:third' },
+        entries: [...first.entries, { kind: 'function', path: 'seal.new' }],
+        sealDiceVersion: '1.5.2',
+      },
+    ],
+    { id: 'compat-1.5.x' },
+  );
+  assert.deepEqual(profile.compatibility.members, ['1.5.0', '1.5.1', '1.5.2']);
+  assert.equal(
+    profile.entries.find((entry) => entry.path === 'seal.new').optional,
+    true,
   );
 });
 

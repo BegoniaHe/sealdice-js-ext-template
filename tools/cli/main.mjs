@@ -26,7 +26,9 @@ import {
 import { run, runChecked } from './lib/process.mjs';
 import { findTestFiles } from './lib/test-files.mjs';
 import {
-  compatibilityTarget,
+  exactTargets,
+  profileForTarget,
+  profileTargets,
   resolveTarget,
   targetFromArguments,
   tsconfigForTarget,
@@ -86,13 +88,10 @@ async function localTool(name) {
   return executable;
 }
 
-async function typecheck(target) {
+async function typecheck(config, target) {
   const tsc = await localTool('tsc');
-  await runChecked(tsc, [
-    '--noEmit',
-    '--project',
-    fromRoot(tsconfigForTarget(target)),
-  ]);
+  const tsconfig = await tsconfigForTarget(config, target);
+  await runChecked(tsc, ['--noEmit', '--project', tsconfig]);
 }
 
 async function format(check) {
@@ -105,10 +104,10 @@ async function lint() {
   await runChecked(eslint, ['.']);
 }
 
-async function build(target, mode = 'production') {
-  await typecheck(target);
+async function build(config, target, mode = 'production') {
+  await typecheck(config, target);
   const { buildBundle } = await import('../tasks/build.mjs');
-  const output = await buildBundle({ mode, target });
+  const output = await buildBundle({ config, mode, target });
   process.stdout.write(
     `Built ${path.relative(rootDirectory, output)} for ${target}.\n`,
   );
@@ -124,9 +123,9 @@ async function runHostTests(target) {
   });
 }
 
-async function bundleSmoke(target) {
+async function bundleSmoke(config, target) {
   const { buildBundle } = await import('../tasks/build.mjs');
-  await buildBundle({ mode: 'development', target });
+  await buildBundle({ config, mode: 'development', target });
   await runChecked(process.execPath, [
     'tools/tasks/bundle-smoke.mjs',
     '--target',
@@ -134,13 +133,13 @@ async function bundleSmoke(target) {
   ]);
 }
 
-async function testTarget(target) {
+async function testTarget(config, target) {
   await runHostTests(target);
-  await bundleSmoke(target);
+  await bundleSmoke(config, target);
 }
 
 async function testAllTargets(config) {
-  for (const target of config.sealDice.targets) await testTarget(target);
+  for (const target of exactTargets(config)) await testTarget(config, target);
 }
 
 async function test(config, argumentsList) {
@@ -150,7 +149,7 @@ async function test(config, argumentsList) {
     'test --all-targets cannot be combined with --target',
   );
   if (allTargets) return testAllTargets(config);
-  return testTarget(resolveTarget(config, argumentsList));
+  return testTarget(config, resolveTarget(config, argumentsList));
 }
 
 async function doctor(config, json) {
@@ -165,9 +164,7 @@ async function doctor(config, json) {
     npm: null,
     packageManager: config.packageManager,
     packageManagerVersion: metadata.packageManager ?? null,
-    profiles: config.sealDice.targets.concat(
-      config.sealDice.compatibilityProfile,
-    ),
+    profiles: profileTargets(config),
     repository: rootDirectory,
     lockfiles: locks,
   };
@@ -199,8 +196,12 @@ async function doctor(config, json) {
 
 async function packageArtifact(config, target) {
   const extension = await loadExtensionMetadata({ release: true });
-  await check(config, ['--target', target]);
-  const output = await build(target, 'production');
+  const profile = profileForTarget(config, target);
+  await check(
+    config,
+    profile.kind === 'compatibility' ? ['--all-targets'] : ['--target', target],
+  );
+  const output = await build(config, target, 'production');
   const artifact = artifactName(extension);
   const releaseDirectory = fromRoot(config.release.directory);
   const releasePath = path.join(releaseDirectory, artifact);
@@ -218,7 +219,7 @@ async function packageArtifact(config, target) {
   }
   const digest = sha256(content);
   await writeAtomic(`${releasePath}.sha256`, `${digest}  ${artifact}\n`);
-  const profile = JSON.parse(
+  const apiProfile = JSON.parse(
     await fs.readFile(fromRoot('api', 'profiles', `${target}.json`), 'utf8'),
   );
   const manifest = {
@@ -228,7 +229,7 @@ async function packageArtifact(config, target) {
     license: extension.license,
     name: extension.name,
     profile: target,
-    profileHash: `sha256:${sha256(stableJson(profile))}`,
+    profileHash: `sha256:${sha256(stableJson(apiProfile))}`,
     sha256: digest,
     version: extension.version,
   };
@@ -241,9 +242,8 @@ async function packageArtifact(config, target) {
 async function targetCommand(config, argumentsList) {
   const action = argumentsList[0] ?? 'list';
   if (action === 'list') {
-    for (const target of config.sealDice.targets)
+    for (const target of profileTargets(config))
       process.stdout.write(`${target}\n`);
-    process.stdout.write(`${config.sealDice.compatibilityProfile}\n`);
     return;
   }
   if (action === 'show') {
@@ -253,7 +253,7 @@ async function targetCommand(config, argumentsList) {
   if (action === 'check') {
     const target = argumentsList[1];
     if (!target) throw new CliError('target check requires an id');
-    await typecheck(resolveTarget(config, ['--target', target]));
+    await typecheck(config, resolveTarget(config, ['--target', target]));
     return;
   }
   throw new CliError(`Unknown target command: ${action}`);
@@ -267,14 +267,17 @@ async function check(config, argumentsList) {
   );
   await format(true);
   await lint();
-  await typecheck(
-    allTargets ? compatibilityTarget : resolveTarget(config, argumentsList),
-  );
+  if (allTargets) {
+    for (const target of profileTargets(config))
+      await typecheck(config, target);
+  } else {
+    await typecheck(config, resolveTarget(config, argumentsList));
+  }
   if (allTargets) {
     await testAllTargets(config);
   } else {
     const target = resolveTarget(config, argumentsList);
-    await testTarget(target);
+    await testTarget(config, target);
   }
   await commandApi(['check'], config);
 }
@@ -318,14 +321,16 @@ async function main() {
   if (command === 'fmt') return format(argumentsList.includes('--check'));
   if (command === 'lint') return lint();
   if (command === 'typecheck')
-    return typecheck(resolveTarget(config, argumentsList));
+    return typecheck(config, resolveTarget(config, argumentsList));
   if (command === 'test') return test(config, argumentsList);
   if (command === 'check') return check(config, argumentsList);
-  if (command === 'build') return build(resolveTarget(config, argumentsList));
+  if (command === 'build')
+    return build(config, resolveTarget(config, argumentsList));
   if (command === 'watch') {
-    await typecheck(resolveTarget(config, argumentsList));
+    const target = resolveTarget(config, argumentsList);
+    await typecheck(config, target);
     const { watchBundle } = await import('../tasks/build.mjs');
-    return watchBundle({ target: resolveTarget(config, argumentsList) });
+    return watchBundle({ config, target });
   }
   if (command === 'package')
     return packageArtifact(config, resolveTarget(config, argumentsList));

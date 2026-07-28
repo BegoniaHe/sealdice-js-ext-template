@@ -1,7 +1,7 @@
 /**
- * SealDice JavaScript plugin API for SealDice 1.5.x.
+ * SealDice JavaScript plugin API for SealDice compat-1.5.x.
  *
- * Generated from api/profiles/1.5.x.json. The TypeScript
+ * Generated from api/profiles/compat-1.5.x.json. The TypeScript
  * semantic mapping is maintained by the checked-in profile override.
  */
 declare namespace seal {

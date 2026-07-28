@@ -1,64 +1,78 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import Ajv2020 from 'ajv/dist/2020.js';
+import semver from 'semver';
+
 import { CliError, assert } from './errors.mjs';
 import { readJson } from './files.mjs';
-import { configPath, rootDirectory } from './paths.mjs';
+import { configPath, fromRoot, rootDirectory } from './paths.mjs';
 
-const supportedTargets = new Set(['1.5.0', '1.5.1', '1.6.0']);
-const compatibilityTargets = ['1.5.0', '1.5.1'];
+let schemaValidator;
 
-function validateConfig(config) {
+async function validateSchema(config) {
+  if (!schemaValidator) {
+    const schema = await readJson(
+      fromRoot('api', 'schema', 'seal.config.schema.json'),
+    );
+    const ajv = new Ajv2020({ allErrors: true, strict: true });
+    schemaValidator = ajv.compile(schema);
+  }
+  if (schemaValidator(config)) return;
+  const errors = (schemaValidator.errors ?? [])
+    .map((error) => `${error.instancePath || '/'} ${error.message}`)
+    .join('; ');
+  throw new CliError(`seal.config.json does not match its schema: ${errors}`);
+}
+
+function assertSafeTypecheckPath(file) {
   assert(
-    config && typeof config === 'object',
-    'seal.config.json must be an object',
+    !path.isAbsolute(file) &&
+      !file.split(/[\\/]/u).includes('..') &&
+      (file.startsWith('src/') || file.startsWith('tests/')),
+    `typecheckInclude must stay under src/ or tests/: ${file}`,
   );
+}
+
+export async function validateConfig(config) {
+  await validateSchema(config);
+  const profiles = config.sealDice.profiles;
+  const ids = new Set();
+  const exact = new Map();
+  for (const profile of profiles) {
+    assert(
+      !ids.has(profile.id),
+      `Duplicate SealDice profile id: ${profile.id}`,
+    );
+    ids.add(profile.id);
+    if (profile.kind !== 'exact') continue;
+    assert(
+      semver.valid(profile.id) === profile.id,
+      `Exact profile id must be a canonical semantic version: ${profile.id}`,
+    );
+    for (const file of profile.typecheckInclude ?? [])
+      assertSafeTypecheckPath(file);
+    exact.set(profile.id, profile);
+  }
+  assert(exact.size > 0, 'At least one exact SealDice profile is required');
+  for (const profile of profiles) {
+    if (profile.kind !== 'compatibility') continue;
+    let previous = null;
+    for (const member of profile.members) {
+      assert(
+        exact.has(member),
+        `Compatibility profile ${profile.id} references unknown exact profile: ${member}`,
+      );
+      assert(
+        previous === null || semver.lt(previous, member),
+        `Compatibility profile ${profile.id} members must be in ascending semantic-version order`,
+      );
+      previous = member;
+    }
+  }
   assert(
-    config.schemaVersion === 1,
-    'seal.config.json schemaVersion must be 1',
-  );
-  assert(config.packageManager === 'npm', 'packageManager must be npm');
-  assert(
-    config.sealDice && typeof config.sealDice === 'object',
-    'sealDice configuration is required',
-  );
-  assert(
-    Array.isArray(config.sealDice.targets),
-    'sealDice.targets must be an array',
-  );
-  assert(
-    config.sealDice.targets.length === supportedTargets.size &&
-      config.sealDice.targets.every((target) => supportedTargets.has(target)),
-    'sealDice.targets must contain exactly 1.5.0, 1.5.1 and 1.6.0',
-  );
-  assert(
-    supportedTargets.has(config.sealDice.defaultTarget),
-    'sealDice.defaultTarget must be a supported target',
-  );
-  assert(
-    config.sealDice.compatibilityProfile === 'compat-1.5.x',
-    'sealDice.compatibilityProfile must be compat-1.5.x',
-  );
-  assert(
-    Array.isArray(config.sealDice.compatibilityTargets) &&
-      config.sealDice.compatibilityTargets.length ===
-        compatibilityTargets.length &&
-      config.sealDice.compatibilityTargets.every(
-        (target, index) => target === compatibilityTargets[index],
-      ),
-    'sealDice.compatibilityTargets must be 1.5.0 and 1.5.1 in order',
-  );
-  assert(
-    config.release && typeof config.release === 'object',
-    'release configuration is required',
-  );
-  assert(
-    config.release.directory === 'release',
-    'release.directory must be release',
-  );
-  assert(
-    config.release.checksum === 'sha256',
-    'release.checksum must be sha256',
+    ids.has(config.sealDice.defaultTarget),
+    `sealDice.defaultTarget must reference a configured profile: ${config.sealDice.defaultTarget}`,
   );
   return config;
 }

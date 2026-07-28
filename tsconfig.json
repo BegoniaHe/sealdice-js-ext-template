@@ -1,4 +1,9 @@
 {
-  "extends": "./tsconfig.compat-1.5.x.json",
-  "compileOnSave": false
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "include": [
+    "src/**/*.ts",
+    "tests/seal-api-contract.ts",
+    "types/profiles/compat-1.5.x/seal.d.ts"
+  ]
 }
