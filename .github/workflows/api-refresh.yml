@@ -4,10 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Exact SealDice target
+        description: Exact profile id already registered in seal.config.json
         required: true
-        type: choice
-        options: ['1.5.0', '1.5.1', '1.6.0']
+        type: string
       core_ref:
         description: Exact sealdice-core commit (use the build-repo gitlink for distribution releases)
         required: true
