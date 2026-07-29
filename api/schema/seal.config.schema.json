@@ -103,7 +103,7 @@
     "release": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["directory", "checksum", "defaultFormats"],
+      "required": ["directory", "checksum", "defaultFormats", "artifactPolicy"],
       "properties": {
         "directory": { "const": "release" },
         "checksum": { "const": "sha256" },
@@ -112,6 +112,26 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "enum": ["js", "sealpack"] }
+        },
+        "artifactPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["forbiddenPaths", "forbiddenExtensions"],
+          "properties": {
+            "forbiddenPaths": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "forbiddenExtensions": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^\\.[A-Za-z0-9]+$"
+              }
+            }
+          }
         }
       }
     },

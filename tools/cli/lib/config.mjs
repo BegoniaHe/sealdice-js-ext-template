@@ -81,6 +81,26 @@ function assertSealpackAssetPath(file, label) {
   return assertSafeProjectPath(file, label, { prefix: 'assets' });
 }
 
+function validateArtifactPolicy(config) {
+  const policy = config.release.artifactPolicy;
+  for (const pattern of policy.forbiddenPaths) {
+    assert(
+      !pattern.includes('\\') &&
+        !pattern.startsWith('/') &&
+        !pattern.split('/').includes('..') &&
+        !pattern.includes('[') &&
+        !pattern.includes(']'),
+      `release.artifactPolicy.forbiddenPaths entry is not a safe archive glob: ${pattern}`,
+    );
+  }
+  for (const extension of policy.forbiddenExtensions) {
+    assert(
+      extension === extension.toLowerCase(),
+      `release.artifactPolicy.forbiddenExtensions must use lowercase extensions: ${extension}`,
+    );
+  }
+}
+
 function validateSealpackConfig(config) {
   const sealpack = config.sealpack;
   assertPackageID(sealpack.packageId);
@@ -201,6 +221,7 @@ export async function validateConfig(config) {
     ids.has(config.sealDice.defaultTarget),
     `sealDice.defaultTarget must reference a configured profile: ${config.sealDice.defaultTarget}`,
   );
+  validateArtifactPolicy(config);
   validateSealpackConfig(config);
   return config;
 }

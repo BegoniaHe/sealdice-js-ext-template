@@ -39,7 +39,11 @@
   "release": {
     "directory": "release",
     "checksum": "sha256",
-    "defaultFormats": ["js"]
+    "defaultFormats": ["js"],
+    "artifactPolicy": {
+      "forbiddenPaths": [],
+      "forbiddenExtensions": []
+    }
   },
   "sealpack": {
     "packageId": "template/sealdice-js-ext-template",

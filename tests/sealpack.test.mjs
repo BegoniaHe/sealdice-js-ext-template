@@ -3,6 +3,7 @@ import { inflateRawSync } from 'node:zlib';
 import test from 'node:test';
 
 import {
+  artifactPolicyViolations,
   createZipArchive,
   renderSealpackInfo,
 } from '../tools/tasks/sealpack.mjs';
@@ -43,6 +44,22 @@ const extension = {
   name: 'Demo',
   version: '1.2.3',
 };
+
+test('artifact policy rejects declared forbidden archive paths and extensions', () => {
+  assert.deepEqual(
+    artifactPolicyViolations(
+      ['README.md', 'assets/icon.png', 'assets/install.sh', 'scripts/demo.js'],
+      {
+        forbiddenExtensions: ['.png'],
+        forbiddenPaths: ['assets/*install*'],
+      },
+    ),
+    [
+      { path: 'assets/icon.png', rule: 'extension .png' },
+      { path: 'assets/install.sh', rule: 'path assets/*install*' },
+    ],
+  );
+});
 
 function archiveEntries(archive) {
   const end = archive.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));

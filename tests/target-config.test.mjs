@@ -17,6 +17,7 @@ function config(profiles, defaultTarget = profiles[0].id) {
     },
     packageManager: 'npm',
     release: {
+      artifactPolicy: { forbiddenExtensions: [], forbiddenPaths: [] },
       checksum: 'sha256',
       defaultFormats: ['js'],
       directory: 'release',
@@ -108,4 +109,14 @@ test('sealpack assets cannot create unsupported archive root entries', async () 
   const value = config([exact('1.6.0', 'e')]);
   value.sealpack.assets = ['LICENSE'];
   await assert.rejects(() => validateConfig(value), /stay under assets/);
+});
+
+test('artifact policy requires safe path globs and lowercase extensions', async () => {
+  const value = config([exact('1.6.0', 'f')]);
+  value.release.artifactPolicy.forbiddenPaths = ['../assets/**'];
+  await assert.rejects(() => validateConfig(value), /safe archive glob/);
+
+  value.release.artifactPolicy.forbiddenPaths = [];
+  value.release.artifactPolicy.forbiddenExtensions = ['.PNG'];
+  await assert.rejects(() => validateConfig(value), /lowercase extensions/);
 });

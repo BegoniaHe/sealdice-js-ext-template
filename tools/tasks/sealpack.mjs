@@ -60,6 +60,63 @@ function archiveName(packageID, version) {
   return `${packageName}@${version}.sealpack`;
 }
 
+function globPattern(pattern) {
+  let expression = '^';
+  const specialCharacters = '\\^$+?.()|{}[]';
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index];
+    if (character === '*' && pattern[index + 1] === '*') {
+      if (pattern[index + 2] === '/') {
+        expression += '(?:.*/)?';
+        index += 2;
+      } else {
+        expression += '.*';
+        index += 1;
+      }
+    } else if (character === '*') expression += '[^/]*';
+    else if (character === '?') expression += '[^/]';
+    else if (specialCharacters.includes(character))
+      expression += `\\${character}`;
+    else expression += character;
+  }
+  return new RegExp(`${expression}$`, 'u');
+}
+
+export function artifactPolicyViolations(paths, policy) {
+  const patterns = policy.forbiddenPaths.map((pattern) => ({
+    expression: globPattern(pattern),
+    pattern,
+  }));
+  const forbiddenExtensions = new Set(policy.forbiddenExtensions);
+  const violations = [];
+  for (const archivePath of [...paths].sort()) {
+    const pathMatch = patterns.find(({ expression }) =>
+      expression.test(archivePath),
+    );
+    if (pathMatch) {
+      violations.push({ path: archivePath, rule: `path ${pathMatch.pattern}` });
+      continue;
+    }
+    const extension = path.posix.extname(archivePath).toLowerCase();
+    if (forbiddenExtensions.has(extension))
+      violations.push({ path: archivePath, rule: `extension ${extension}` });
+  }
+  return violations;
+}
+
+export function assertArtifactPolicy(paths, policy) {
+  const violations = artifactPolicyViolations(paths, policy);
+  if (violations.length) {
+    const detail = violations
+      .map(({ path: archivePath, rule }) => `${archivePath} (${rule})`)
+      .join(', ');
+    throw new CliError(
+      `[release:artifact-policy] Sealpack contents violate release.artifactPolicy: ${detail}`,
+      3,
+    );
+  }
+}
+
 function renderDependencies(dependencies) {
   return Object.entries(dependencies)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -335,6 +392,11 @@ export async function stageSealpack({ bundlePath, config, extension }) {
           3,
         );
     }
+
+    assertArtifactPolicy(
+      [...entries.keys(), 'info.toml'],
+      config.release.artifactPolicy,
+    );
 
     await fs.writeFile(
       path.join(stageDirectory, 'info.toml'),
