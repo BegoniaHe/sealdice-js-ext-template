@@ -32,16 +32,17 @@ test('clean helper only removes documented generated directories', async () => {
   }
 });
 
-test('test discovery includes nested .test.mjs files only', async () => {
+test('test discovery includes nested native JavaScript and TypeScript tests', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sealw-test-files-'));
   try {
     await fs.mkdir(path.join(root, 'nested'));
     await fs.writeFile(path.join(root, 'root.test.mjs'), '');
     await fs.writeFile(path.join(root, 'nested', 'child.test.mjs'), '');
+    await fs.writeFile(path.join(root, 'nested', 'child.test.ts'), '');
     await fs.writeFile(path.join(root, 'nested', 'support.mjs'), '');
     assert.deepEqual(
       (await findTestFiles(root)).map((file) => path.relative(root, file)),
-      ['nested/child.test.mjs', 'root.test.mjs'],
+      ['nested/child.test.mjs', 'nested/child.test.ts', 'root.test.mjs'],
     );
   } finally {
     await fs.rm(root, { force: true, recursive: true });

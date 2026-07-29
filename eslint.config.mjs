@@ -3,6 +3,7 @@ import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 const sourceFiles = ['src/**/*.ts'];
+const testFiles = ['tests/**/*.test.ts'];
 
 export default tseslint.config(
   {
@@ -35,6 +36,14 @@ export default tseslint.config(
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
       },
+    },
+  },
+  {
+    files: testFiles,
+    languageOptions: { parser: tseslint.parser },
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'error',
     },
   },
   ...tseslint.configs.strictTypeChecked.map((config) => ({

@@ -59,11 +59,13 @@ for (const target of targets) {
     assert.equal(extension.storageGet('key'), 'value');
     assert.deepEqual(host.seal.vars.strGet({}, '$tTitle'), ['SealDice', true]);
     assert.equal(host.replies[0], 'reply');
+    assert.deepEqual(host.messages[0].channel, 'sender');
     assert.equal(task.off(), false);
     assert.equal(task.on(), true);
     assert.equal(host.seal.format({}, 'text'), 'text');
     host.seal.gameSystem.newTemplate('{}');
     assert.deepEqual(host.gameSystems, [{ data: '{}', format: 'json' }]);
+    assert.equal(host.lastEvent().kind, 'message-reply');
   });
 }
 
@@ -95,4 +97,45 @@ test('mock host uses each profile arity and captures 1.6.0 config groups', async
   assert.equal(current.seal.ext.registerTask.length, 7);
   assert.equal(current.config[0].group, 'Appearance');
   assert.equal(current.tasks[0].group, 'Schedules');
+});
+
+test('mock host provides controllable time, task execution, and cleanup assertions', async () => {
+  const host = await createMockHost('1.6.0', { now: 1_000 });
+  const extension = host.seal.ext.new('session-test', 'author', '1.0.0');
+  const events = [];
+  host.clock.setTimeout(() => events.push(`timeout:${host.clock.now}`), 25);
+  const interval = host.clock.setInterval(
+    () => events.push(`interval:${host.clock.now}`),
+    10,
+  );
+  host.clock.advanceBy(25);
+  host.clock.clearInterval(interval);
+  host.clock.assertNoPending();
+
+  host.seal.ext.registerStringConfig(
+    extension,
+    'title',
+    'default',
+    'description',
+  );
+  host.setConfig(extension, 'title', 'changed');
+  assert.equal(host.seal.ext.getStringConfig(extension, 'title'), 'changed');
+
+  host.seal.ext.registerTask(
+    extension,
+    'daily',
+    '08:30',
+    (context) => events.push(`task:${context.now}`),
+    'session-cleanup',
+  );
+  host.runTask('session-cleanup');
+  assert.deepEqual(events, [
+    'interval:1010',
+    'interval:1020',
+    'timeout:1025',
+    'task:1025',
+  ]);
+  assert.throws(() => host.assertNoActiveTasks(), /session-cleanup/);
+  host.tasks[0].task.off();
+  assert.doesNotThrow(() => host.assertNoActiveTasks());
 });

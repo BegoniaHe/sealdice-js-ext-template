@@ -2,7 +2,7 @@ import { sample } from 'lodash-es';
 
 import extensionMetadata from '../extension.json';
 
-import { nameList } from './utils';
+import { nameList } from './utils.ts';
 
 function main(): void {
   const existingExtension = seal.ext.find(extensionMetadata.id);

@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FakeClock } from './fake-clock.mjs';
+
 const rootDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../..',
@@ -20,15 +22,19 @@ function latestConfig(config, extension, key) {
   return null;
 }
 
-export async function createMockHost(target) {
+export async function createMockHost(target, { now = 0 } = {}) {
   const profile = await readProfile(target);
   const entries = new Map(profile.entries.map((entry) => [entry.path, entry]));
   const extensions = new Map();
   const replies = [];
+  const messages = [];
   const variables = new Map();
   const config = [];
   const tasks = [];
   const gameSystems = [];
+  const events = [];
+  const clock = new FakeClock(now);
+  const event = (kind, details = {}) => events.push({ ...details, kind });
 
   const makeExtension = (name, author, version) => {
     const storage = new Map();
@@ -82,6 +88,7 @@ export async function createMockHost(target) {
     );
     if (index !== -1) config.splice(index, 1);
     config.push(item);
+    event('config-register', { key: item.key, type: item.type });
   };
   const createConfigRegistrar = (type, memberPath, groupArity) =>
     profileFunction(memberPath, (extension, key, defaultValue, ...rest) => {
@@ -103,13 +110,17 @@ export async function createMockHost(target) {
       item.rest = values;
       recordConfig(item);
     });
-  const reply = (_ctx, _msg, text) => replies.push(text);
+  const reply = (channel) => (ctx, msg, text) => {
+    replies.push(text);
+    messages.push({ channel, ctx, msg, text });
+    event('message-reply', { channel, text });
+  };
   const ext = objectFromProfile('seal.ext', {});
   if (ext) {
-    ext.find = profileFunction(
-      'seal.ext.find',
-      (name) => extensions.get(name) ?? null,
-    );
+    ext.find = profileFunction('seal.ext.find', (name) => {
+      event('extension-find', { name });
+      return extensions.get(name) ?? null;
+    });
     ext.getConfig = profileFunction('seal.ext.getConfig', (extension, key) =>
       latestConfig(config, extension, key),
     );
@@ -144,7 +155,10 @@ export async function createMockHost(target) {
         return Array.isArray(value) ? value : [];
       },
     );
-    ext.new = profileFunction('seal.ext.new', makeExtension);
+    ext.new = profileFunction('seal.ext.new', (name, author, version) => {
+      event('extension-new', { name });
+      return makeExtension(name, author, version);
+    });
     ext.newCmdExecuteResult = profileFunction(
       'seal.ext.newCmdExecuteResult',
       (solved) => ({ showHelp: false, solved }),
@@ -155,9 +169,10 @@ export async function createMockHost(target) {
       (extension, key, defaultValue, description) =>
         createConfigItem(extension, key, defaultValue, description),
     );
-    ext.register = profileFunction('seal.ext.register', (extension) =>
-      extensions.set(extension.name, extension),
-    );
+    ext.register = profileFunction('seal.ext.register', (extension) => {
+      event('extension-register', { name: extension.name });
+      extensions.set(extension.name, extension);
+    });
     ext.registerBoolConfig = createConfigRegistrar(
       'bool',
       'seal.ext.registerBoolConfig',
@@ -206,6 +221,7 @@ export async function createMockHost(target) {
           taskType,
           value,
         });
+        event('task-register', { key, taskType, value });
         return task;
       },
     );
@@ -287,9 +303,9 @@ export async function createMockHost(target) {
     memberBan: profileFunction('seal.memberBan', () => {}),
     memberKick: profileFunction('seal.memberKick', () => {}),
     newMessage: profileFunction('seal.newMessage', () => ({})),
-    replyGroup: profileFunction('seal.replyGroup', reply),
-    replyPerson: profileFunction('seal.replyPerson', reply),
-    replyToSender: profileFunction('seal.replyToSender', reply),
+    replyGroup: profileFunction('seal.replyGroup', reply('group')),
+    replyPerson: profileFunction('seal.replyPerson', reply('person')),
+    replyToSender: profileFunction('seal.replyToSender', reply('sender')),
     setPlayerGroupCard: profileFunction(
       'seal.setPlayerGroupCard',
       (_ctx, template) => template,
@@ -320,12 +336,45 @@ export async function createMockHost(target) {
     }),
   };
   return {
+    assertNoActiveTasks() {
+      const active = tasks.filter(({ task }) => task.active);
+      if (active.length) {
+        const keys = active.map(({ key }) => key || '(anonymous)').join(', ');
+        throw new Error(`Mock host still has active tasks: ${keys}`);
+      }
+    },
+    clock,
     config,
+    events,
     extensions,
     gameSystems,
+    globals: {
+      clearInterval: (identifier) => clock.clearInterval(identifier),
+      clearTimeout: (identifier) => clock.clearTimeout(identifier),
+      setInterval: (...argumentsList) => clock.setInterval(...argumentsList),
+      setTimeout: (...argumentsList) => clock.setTimeout(...argumentsList),
+    },
+    lastEvent() {
+      return events.at(-1) ?? null;
+    },
+    messages,
     profile,
     replies,
+    runTask(key, context = {}) {
+      const task = tasks.find(
+        (candidate) => candidate.key === key && candidate.task.active,
+      );
+      if (!task) throw new Error(`No active mock task registered as ${key}`);
+      event('task-run', { key });
+      return task.callback({ key, now: clock.now, ...context });
+    },
     seal,
+    setConfig(extension, key, value) {
+      const item = latestConfig(config, extension, key);
+      if (!item) throw new Error(`No mock config registered as ${key}`);
+      item.value = value;
+      event('config-set', { key });
+    },
     tasks,
     variables,
   };

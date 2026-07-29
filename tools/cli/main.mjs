@@ -23,11 +23,13 @@ import {
   profileForTarget,
   profileTargets,
   resolveTarget,
+  testTsconfigForTarget,
   targetFromArguments,
   tsconfigForTarget,
 } from './lib/target.mjs';
 import { buildBundle, watchBundle } from '../tasks/build.mjs';
 import { runTaskGraph } from '../tasks/graph.mjs';
+import { createSingleTargetProject } from '../tasks/init.mjs';
 import {
   archiveSealpack,
   assertSealpackTarget,
@@ -66,6 +68,8 @@ Core commands:
   runtime test [--core <path>] [--target <id>|--all-targets]
                                Load the bundle in the matching SealDice goja runtime
   clean                        Remove known generated outputs only
+  init --preset single-target --directory <path> --target <id>
+                               Create a minimal exact-target project in a new directory
 
 Dependency commands:
   deps add <package...> [--dev]
@@ -105,6 +109,8 @@ async function typecheck(config, target) {
   const tsc = await localTool('tsc');
   const tsconfig = await tsconfigForTarget(config, target);
   await runChecked(tsc, ['--noEmit', '--project', tsconfig]);
+  const testTsconfig = await testTsconfigForTarget(config, target);
+  await runChecked(tsc, ['--noEmit', '--project', testTsconfig]);
 }
 
 async function format(check) {
@@ -391,6 +397,33 @@ async function packageArtifacts(config, target, formats, argumentsList) {
   }
 }
 
+function requiredOption(argumentsList, option) {
+  const index = argumentsList.indexOf(option);
+  if (index === -1) throw new CliError(`${option} is required`);
+  const value = argumentsList[index + 1];
+  if (!value || value.startsWith('--'))
+    throw new CliError(`${option} requires a value`);
+  return value;
+}
+
+async function initializeProject(config, argumentsList) {
+  const preset = requiredOption(argumentsList, '--preset');
+  if (preset !== 'single-target')
+    throw new CliError('--preset currently supports only single-target');
+  assert(
+    !argumentsList.includes('--all-targets'),
+    'init does not accept --all-targets',
+  );
+  const target = resolveTarget(config, argumentsList, {
+    allowCompatibility: false,
+  });
+  const directory = requiredOption(argumentsList, '--directory');
+  const output = await createSingleTargetProject({ config, directory, target });
+  process.stdout.write(
+    `Initialized single-target SealDice ${target} project at ${output}.\n`,
+  );
+}
+
 async function targetCommand(config, argumentsList) {
   const action = argumentsList[0] ?? 'list';
   if (action === 'list') {
@@ -453,6 +486,7 @@ async function main() {
   }
   if (command === 'api') return commandApi(argumentsList, config);
   if (command === 'target') return targetCommand(config, argumentsList);
+  if (command === 'init') return initializeProject(config, argumentsList);
   const packageManager = await resolvePackageManager(config);
   if (command === 'install')
     return installDependencies(

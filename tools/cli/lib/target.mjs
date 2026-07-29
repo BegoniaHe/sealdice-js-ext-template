@@ -70,3 +70,19 @@ export async function tsconfigForTarget(config, target) {
   });
   return file;
 }
+
+export async function testTsconfigForTarget(config, target) {
+  const profile = profileForTarget(config, target);
+  const include = [
+    '../../src/**/*.ts',
+    '../../tests/**/*.test.ts',
+    `../../types/profiles/${profile.id}/seal.d.ts`,
+  ];
+  const file = fromRoot('.seal', 'cache', `tsconfig.tests.${profile.id}.json`);
+  await writeJsonAtomic(file, {
+    extends: '../../tsconfig.base.json',
+    compilerOptions: { types: ['node'] },
+    include,
+  });
+  return file;
+}
