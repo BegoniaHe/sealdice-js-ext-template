@@ -52,6 +52,9 @@ mise exec -- ./sealw install
 初版打包任务只会将 production bundle 放到 `sealpack.scriptPath`，并加入根目录 `README.md` 和显式声明的
 `assets/` 路径；不会假称已支持牌堆、回复、帮助文档或模板等包内资源。
 
+`release.artifactPolicy` 可在打包时拒绝 staging 后的 `.sealpack` 内容。使用 `forbiddenPaths` 设置 `**/*.png` 或
+`assets/**` 等 glob，使用 `forbiddenExtensions` 设置 `.png` 等小写后缀；它限制的是归档路径，不是 bundle 中的行为。
+
 ## 4. 编写扩展
 
 入口文件是 `src/index.ts`。示例会：
@@ -65,6 +68,10 @@ target 不支持的 API。
 
 当前 API 不提供安全配置或密钥存储。不要使用 `registerStringConfig`、扩展 storage 或源码保存 API key、
 token 或密码；联网扩展的限制和权限语义见[安全指南](security.md)。
+
+常用配置可由 `src/config.ts` 声明，而不必分别手写注册、读取和校验。`definePluginConfig()` 配合 `integer()`、
+`option()` 等描述器会生成 SealDice 配置注册、默认值回退、范围/枚举校验和 Markdown 表。读取结果包含 `values` 与
+`issues`，应处理持久化配置不符合当前约束的情况。
 
 ## 5. 构建并在 SealDice 中测试
 
@@ -105,6 +112,14 @@ token 或密码；联网扩展的限制和权限语义见[安全指南](security
 API，必须在运行时进行特性检测后再调用。
 
 导出 `.sealpack` 必须选择不低于 `sealpack.minSealDice` 的精确 target，因此不能使用 `compat-1.5.x`。
+
+如果项目从一开始只支持一个精确版本，可在模板根目录运行：
+
+```sh
+./sealw init --preset single-target --directory ../my-extension --target 1.6.0
+```
+
+这会生成不包含兼容 profile、其他 API 产物或 `reference/` 的新项目；输出目录必须不存在。
 
 ## 7. 分享前验证
 

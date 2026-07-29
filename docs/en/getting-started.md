@@ -62,6 +62,11 @@ The initial package task stages the production bundle at
 paths. It does not claim support for package-provided decks, reply files,
 help documents, or templates yet.
 
+`release.artifactPolicy` can reject the final staged `.sealpack` content. Use
+`forbiddenPaths` for globs such as `**/*.png` or `assets/**`, and
+`forbiddenExtensions` for lowercase suffixes such as `.png`. It constrains
+archive paths, not behavior embedded in the bundle.
+
 ## 4. Write the extension
 
 The entry point is `src/index.ts`. The example:
@@ -77,6 +82,12 @@ will flag APIs that do not exist in that target.
 The current API has no secure configuration or key store. Do not use
 `registerStringConfig`, extension storage, or source code for API keys, tokens,
 or passwords. See the [security guide](security.md) before building a networked extension.
+
+Use `src/config.ts` for ordinary plugin settings instead of hand-writing each
+registration, read, and validation path. `definePluginConfig()` with helpers
+such as `integer()` and `option()` generates SealDice registration, fallback
+defaults, range or enum validation, and a Markdown table. Read results include
+both `values` and `issues` so persisted invalid settings can be handled safely.
 
 ## 5. Build and test it in SealDice
 
@@ -121,6 +132,16 @@ members marked optional by a compatibility profile.
 
 `.sealpack` export requires an exact target at or above `sealpack.minSealDice`.
 It is therefore intentionally unavailable for `compat-1.5.x`.
+
+For a project that only supports one exact version from the beginning, run this
+from the template root:
+
+```sh
+./sealw init --preset single-target --directory ../my-extension --target 1.6.0
+```
+
+It creates a new project without compatibility profiles, other API artifacts,
+or `reference/`; the output directory must not already exist.
 
 ## 7. Verify before sharing
 

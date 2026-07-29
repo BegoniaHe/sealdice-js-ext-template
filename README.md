@@ -51,6 +51,15 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 脚本一致。`compat-1.5.x` 不包含 1.6 API。`check --all-targets` 对每个注册 profile 做 typecheck，
 并对每个精确 mock host 构建和执行实际 bundle smoke；精确目标扩展则应使用对应的 `--target` 检查。
 
+只支持一个固定宿主版本时，可在新目录中生成精简预设：
+
+```sh
+./sealw init --preset single-target --directory ../my-extension --target 1.6.0
+```
+
+该预设只保留指定精确 profile、对应 API 产物、类型、测试 profile 与日常命令；不会复制 `reference/`，发布时请显式提供
+`--core`。它只接受不存在的输出目录，绝不会删改当前项目。
+
 ## Daily Commands
 
 ```text
@@ -67,6 +76,8 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 ./sealw package --format js|sealpack|both --target <id>
                                                    Verify and create release artifacts
 ./sealw clean                                   Remove only generated directories
+./sealw init --preset single-target --directory <path> --target <id>
+                                                   Create a minimal exact-target project
 ```
 
 `SEAL_TARGET`、`SEAL_CORE_DIR` 和 `SEAL_OFFLINE` 是支持的环境覆盖项；`SEAL_TARGET` 必须引用
@@ -74,6 +85,14 @@ profile 的 `id` 必须是规范的 [Semantic Versioning 2.0.0](https://semver.o
 `package-lock.json` 是唯一的包管理器和 lockfile；依赖变更请使用 `./sealw deps`。
 常用 npm 别名为 `npm run dev`、`npm run build`、`npm test` 和 `npm run check`，它们分别对应
 兼容目标 watch、build、全目标测试和完整检查。
+
+`tests/` 同时发现 `*.test.mjs` 与原生 `*.test.ts`。后者由 Node 26 直接运行，必须使用可擦除的 TypeScript
+语法、ESM 和显式 `.ts` 相对导入；模板会以独立的测试 tsconfig 做类型检查，且不向插件源代码放宽 Node runtime
+全局类型。
+
+扩展的运行时配置可使用 [`src/config.ts`](src/config.ts) 的 `definePluginConfig()` 及 `boolean()`、`integer()`、
+`option()` 等声明器。一个定义可生成 SealDice 注册、类型安全读取、默认值回退、范围/枚举校验和 Markdown 表；mock host
+提供 `setConfig`、`messages`、`clock`、`runTask` 与 `assertNoActiveTasks()`，便于测试会话流程。
 
 ## Release
 
@@ -105,6 +124,13 @@ release/manifest.json
 
 可用 `--format both` 同时生成两种格式。每个产物都有 `.sha256` 文件，`release/manifest.json`
 会列出本次选择的所有产物。
+
+`release.artifactPolicy.forbiddenPaths`（`*`、`**`、`?` glob）和 `forbiddenExtensions` 可声明 `.sealpack`
+内容禁止规则。例如可拒绝 `**/*.png`、`assets/**` 或 `.png`。规则检查最终 staging 文件清单；若要禁止“安装器”行为，
+还应另行使用权限或 runtime policy，而不能仅依赖文件名。
+
+每个 bundle 的 userscript header 会自动注入 Unix 秒级 `@timestamp`，供 SealDice 显示脚本更新时间。正式发布若需字节级复现，
+请设置 `SOURCE_DATE_EPOCH`；GitHub Release 工作流会自动使用当前提交的提交时间。
 
 手动 GitHub Actions 工作流 **Release SealDice Extension** 会重复上述检查、生成构建来源证明，
 并根据其 `format` 输入创建 draft 或正式 GitHub Release。详见[中文发布指南](docs/zh/releasing.md)或
