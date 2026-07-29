@@ -1,0 +1,51 @@
+From b06a2d92a7af0b8b33be33390206297edf29c7bd Mon Sep 17 00:00:00 2001
+From: SealDice JS Extension Template <noreply@example.invalid>
+Date: Wed, 29 Jul 2026 00:00:00 +0000
+Subject: [PATCH] dice: start the JS event loop before JsInit returns
+
+`JsInit` initializes the runtime with `Run`, then starts the persistent loop
+in a newly spawned goroutine. This leaves a scheduling window in which
+`JsInit` has returned but `StartInForeground` has not yet called `setRunning`.
+Code that immediately enters `JsLoadScriptRaw` can then submit a synchronous
+`RequireModule` request before the loop is ready to service it.
+
+`EventLoop.Start` marks the loop running synchronously and runs the loop in
+the background. Call it directly after initialization so callers only observe
+an initialized, running event loop.
+
+This patch targets Core commit b06a2d92a7af0b8b33be33390206297edf29c7bd.
+---
+ dice/dice_jsvm.go | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
+
+diff --git a/dice/dice_jsvm.go b/dice/dice_jsvm.go
+--- a/dice/dice_jsvm.go
++++ b/dice/dice_jsvm.go
+@@ -11,7 +11,6 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"regexp"
+-	"runtime/debug"
+ 	"strconv"
+ 	"strings"
+ 	"sync"
+@@ -659,14 +658,8 @@ func (d *Dice) JsInit() {
+ 		_, _ = vm.RunString(`Object.freeze(seal);Object.freeze(seal.deck);Object.freeze(seal.coc);Object.freeze(seal.ext);Object.freeze(seal.vars);`)
+ 	})
+-	go func() {
+-		defer func() {
+-			if r := recover(); r != nil {
+-				d.Logger.Errorf("JS核心执行异常: %v 堆栈: %v", r, string(debug.Stack()))
+-			}
+-		}()
+-		loop.StartInForeground()
+-	}()
+-	// loop.Start()
++	// Start sets the running state before it returns and serves jobs in the
++	// background, so callers cannot submit work to a loop that has not started.
++	loop.Start()
+ 	(&d.Config).JsEnable = true
+ 	d.Logger.Info("已加载JS环境")
+ 	d.MarkModified()
+-- 
+2.50.1

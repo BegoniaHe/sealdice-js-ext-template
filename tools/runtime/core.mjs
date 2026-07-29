@@ -7,12 +7,15 @@ import { fromRoot } from '../cli/lib/paths.mjs';
 import { run, runChecked } from '../cli/lib/process.mjs';
 import { profileForTarget } from '../cli/lib/target.mjs';
 
+const bundleLoadTimeoutSeconds = 5;
+
 const bundleHarness = `package dice
 
 import (
   "os"
   "reflect"
   "testing"
+  "time"
 
   "go.uber.org/zap"
 )
@@ -58,7 +61,16 @@ func TestSealTemplateBundleRuntime(t *testing.T) {
   }()
 
   script := &JsScriptInfo{Enable: true, Filename: bundle, Name: extensionID}
-  d.JsLoadScriptRaw(script)
+  loaded := make(chan struct{})
+  go func() {
+    d.JsLoadScriptRaw(script)
+    close(loaded)
+  }()
+  select {
+  case <-loaded:
+  case <-time.After(${bundleLoadTimeoutSeconds} * time.Second):
+    t.Fatal("[runtime:js-load-timeout] Dice.JsLoadScriptRaw did not return within ${bundleLoadTimeoutSeconds}s; the Core event loop did not complete RequireModule")
+  }
   if script.ErrText != "" {
     t.Fatalf("SealDice failed to load bundle: %s", script.ErrText)
   }
@@ -183,6 +195,7 @@ async function ensureEmbedDirectory(core, relative) {
 
 export function classifyRuntimeFailure(output, category = 'bundle') {
   if (category === 'sealpack') return 'sealpack-inspection';
+  if (output.includes('[runtime:js-load-timeout]')) return 'js-load-timeout';
   if (output.includes('JsInit did not create an event loop'))
     return 'host-init';
   if (
@@ -227,7 +240,15 @@ async function runBundleHarness(core, bundlePath, extensionID) {
   );
   await runRuntimeCommand(
     'go',
-    ['test', './dice', '-run', '^TestSealTemplateBundleRuntime$', '-count=1'],
+    [
+      'test',
+      './dice',
+      '-run',
+      '^TestSealTemplateBundleRuntime$',
+      '-count=1',
+      '-timeout',
+      `${bundleLoadTimeoutSeconds + 25}s`,
+    ],
     {
       cwd: core,
       env: {

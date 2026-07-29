@@ -1,0 +1,128 @@
+From b06a2d92a7af0b8b33be33390206297edf29c7bd Mon Sep 17 00:00:00 2001
+From: SealDice JS Extension Template <noreply@example.invalid>
+Date: Wed, 29 Jul 2026 00:00:00 +0000
+Subject: [PATCH] dice: bound and cancel synchronous JS module loading
+
+EventLoop.RequireModule queues a callback and waits on its result channel
+without a cancellation path. If the event loop fails to service the callback,
+JsLoadScriptRaw blocks forever and prevents all later JavaScript plugins from
+loading.
+
+Schedule the same global require() call from Core, but wait for at most 30
+seconds. The queued callback checks a cancellation channel before requiring
+the module, so a callback delivered after the timeout has no side effect and
+does not leave a waiting goroutine behind.
+
+The regression test deliberately queues work on a non-running event loop and
+asserts that the bounded operation reports a timeout.
+
+This patch targets Core commit b06a2d92a7af0b8b33be33390206297edf29c7bd.
+---
+ dice/dice_jsvm.go      | 49 +++++++++++++++++++++++++++++++++++++++++++++++-
+ dice/dice_jsvm_test.go | 16 ++++++++++++++++
+ 2 files changed, 64 insertions(+), 1 deletion(-)
+
+diff --git a/dice/dice_jsvm.go b/dice/dice_jsvm.go
+--- a/dice/dice_jsvm.go
++++ b/dice/dice_jsvm.go
+@@ -45,5 +45,7 @@ var (
+ )
+ 
+ var taskTimeRe = regexp.MustCompile(`^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$`)
+ 
++var jsRequireModuleTimeout = 30 * time.Second
++
+ type PrinterFunc struct {
+@@ -1138,5 +1140,52 @@ func JsParseMeta(filePath string) (*JsScriptInfo, error) {
+ 	jsInfo.Enable = !(&d.Config).DisabledJsScripts[jsInfo.Name]
+ 	return jsInfo, nil
+ }
+ 
++func (d *Dice) jsRequireModule(modulePath string) error {
++	if d.ExtLoopManager == nil {
++		return errors.New("JS事件循环未初始化")
++	}
++	loop := d.ExtLoopManager.GetWebLoop()
++	if loop == nil {
++		return errors.New("JS事件循环未初始化")
++	}
++
++	completed := make(chan error, 1)
++	cancelled := make(chan struct{})
++	sendResult := func(err error) {
++		select {
++		case completed <- err:
++		case <-cancelled:
++		}
++	}
++	if !loop.RunOnLoop(func(vm *goja.Runtime) {
++		select {
++		case <-cancelled:
++			return
++		default:
++		}
++
++		requireFunc, ok := goja.AssertFunction(vm.Get("require"))
++		if !ok {
++			sendResult(errors.New("JS require模块未初始化"))
++			return
++		}
++		_, err := requireFunc(goja.Undefined(), vm.ToValue(modulePath))
++		sendResult(err)
++	}) {
++		return errors.New("JS事件循环已终止")
++	}
++
++	timer := time.NewTimer(jsRequireModuleTimeout)
++	defer timer.Stop()
++	select {
++	case err := <-completed:
++		close(cancelled)
++		return err
++	case <-timer.C:
++		close(cancelled)
++		return fmt.Errorf("加载脚本超时（%s），JS事件循环未响应", jsRequireModuleTimeout)
++	}
++}
++
+ func (d *Dice) JsLoadScriptRaw(jsInfo *JsScriptInfo) {
+@@ -1154,7 +1203,7 @@ func (d *Dice) JsLoadScriptRaw(jsInfo *JsScriptInfo) {
+ 			targetPath = jsInfo.Filename
+ 		}
+ 		if err == nil {
+-			_, err = d.ExtLoopManager.GetWebLoop().RequireModule(targetPath)
++			err = d.jsRequireModule(targetPath)
+ 		}
+ 		d.JsLoadingScript = nil
+ 	} else {
+diff --git a/dice/dice_jsvm_test.go b/dice/dice_jsvm_test.go
+--- a/dice/dice_jsvm_test.go
++++ b/dice/dice_jsvm_test.go
+@@ -1,9 +1,25 @@
+ package dice //nolint:testpackage
+ 
+ import (
++	"strings"
+ 	"testing"
++	"time"
+ 
++	"github.com/dop251/goja_nodejs/eventloop"
+ 	"go.uber.org/zap"
+ )
+ 
++func TestJsRequireModuleTimesOutWhenLoopIsNotRunning(t *testing.T) {
++	previousTimeout := jsRequireModuleTimeout
++	jsRequireModuleTimeout = 20 * time.Millisecond
++	t.Cleanup(func() { jsRequireModuleTimeout = previousTimeout })
++
++	loop := eventloop.NewEventLoop()
++	t.Cleanup(loop.Terminate)
++	d := &Dice{ExtLoopManager: &JsLoopManager{loop: loop}}
++	if err := d.jsRequireModule("ignored"); err == nil || !strings.Contains(err.Error(), "加载脚本超时") {
++		t.Fatalf("jsRequireModule() error = %v, want timeout", err)
++	}
++}
++
+ func TestJsInit_WhenExtLoopManagerNil_DoesNotPanic(t *testing.T) {
+-- 
+2.50.1

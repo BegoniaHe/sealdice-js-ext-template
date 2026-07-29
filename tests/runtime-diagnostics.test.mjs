@@ -5,6 +5,12 @@ import { classifyRuntimeFailure } from '../tools/runtime/core.mjs';
 
 test('runtime failures identify the actionable verification phase', () => {
   assert.equal(
+    classifyRuntimeFailure(
+      '[runtime:js-load-timeout] Dice.JsLoadScriptRaw did not return within 5s',
+    ),
+    'js-load-timeout',
+  );
+  assert.equal(
     classifyRuntimeFailure('SealDice failed to load bundle: ReferenceError'),
     'goja-load',
   );
