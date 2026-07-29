@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { runtimePolicyViolations } from '../tools/tasks/runtime-policy.mjs';
+import {
+  runtimePolicyLocations,
+  runtimePolicyViolations,
+} from '../tools/tasks/runtime-policy.mjs';
 
 test('runtime policy rejects unsupported free globals', () => {
   assert.deepEqual(
@@ -9,6 +12,18 @@ test('runtime policy rejects unsupported free globals', () => {
       'const request = new Headers(); new Request("https://example.invalid"); process.exit(1);',
     ),
     ['Headers', 'Request', 'process'],
+  );
+});
+
+test('runtime policy reports the first actionable source location for each global', () => {
+  assert.deepEqual(
+    runtimePolicyLocations(
+      'const value = process.env.VALUE; Buffer.from(value);',
+    ),
+    [
+      { column: 34, line: 1, name: 'Buffer' },
+      { column: 15, line: 1, name: 'process' },
+    ],
   );
 });
 

@@ -80,13 +80,41 @@ export async function loadExtensionMetadata(options) {
   return validateExtensionMetadata(await readJson(metadataFile), options);
 }
 
-export function renderUserscriptHeader(metadata) {
+export function buildTimestamp({
+  environment = process.env,
+  now = Date.now(),
+} = {}) {
+  const sourceDateEpoch = environment.SOURCE_DATE_EPOCH;
+  if (sourceDateEpoch === undefined || sourceDateEpoch === '')
+    return Math.floor(now / 1_000);
+  assert(
+    /^(?:0|[1-9][0-9]*)$/.test(sourceDateEpoch),
+    'SOURCE_DATE_EPOCH must be a non-negative Unix timestamp in seconds',
+    3,
+  );
+  const timestamp = Number(sourceDateEpoch);
+  assert(
+    Number.isSafeInteger(timestamp),
+    'SOURCE_DATE_EPOCH must be a safe Unix timestamp in seconds',
+    3,
+  );
+  return timestamp;
+}
+
+export function renderUserscriptHeader(metadata, { timestamp } = {}) {
   const value = validateExtensionMetadata(metadata);
+  if (timestamp !== undefined)
+    assert(
+      Number.isSafeInteger(timestamp) && timestamp >= 0,
+      'userscript timestamp must be a non-negative Unix timestamp in seconds',
+      3,
+    );
   return [
     '// ==UserScript==',
     `// @name         ${value.name}`,
     `// @author       ${value.author}`,
     `// @version      ${value.version}`,
+    ...(timestamp === undefined ? [] : [`// @timestamp    ${timestamp}`]),
     `// @description  ${value.description}`,
     `// @license      ${value.license}`,
     `// @homepageURL  ${value.homepageUrl}`,

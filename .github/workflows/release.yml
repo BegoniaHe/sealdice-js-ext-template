@@ -70,7 +70,9 @@ jobs:
         env:
           FORMAT: ${{ inputs.format }}
           TARGET: ${{ inputs.target }}
-        run: ./sealw package --format "$FORMAT" --target "$TARGET"
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          ./sealw package --format "$FORMAT" --target "$TARGET"
       - name: Attest release artifact
         uses: actions/attest@v4
         with:

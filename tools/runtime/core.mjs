@@ -113,7 +113,7 @@ export async function resolveRuntimeCore(argumentsList = []) {
     return await fs.realpath(configured);
   } catch {
     throw new CliError(
-      `SealDice core checkout not found at ${configured}; pass --core <path> or initialize reference/sealdice-core`,
+      `[runtime:core] SealDice core checkout not found at ${configured}; pass --core <path> or initialize reference/sealdice-core`,
       4,
     );
   }
@@ -133,7 +133,7 @@ async function assertCoreCommit(core, commit, target) {
   );
   if (result.code === 0) return;
   throw new CliError(
-    `Core checkout does not contain runtimeCoreCommit ${commit} for ${target}; fetch that exact commit before running runtime verification`,
+    `[runtime:core-commit] Core checkout does not contain runtimeCoreCommit ${commit} for ${target}; fetch that exact commit before running runtime verification`,
     4,
   );
 }
@@ -181,6 +181,43 @@ async function ensureEmbedDirectory(core, relative) {
   );
 }
 
+export function classifyRuntimeFailure(output, category = 'bundle') {
+  if (category === 'sealpack') return 'sealpack-inspection';
+  if (output.includes('JsInit did not create an event loop'))
+    return 'host-init';
+  if (
+    output.includes('SealDice failed to load bundle') ||
+    output.includes('disabled the bundle while loading')
+  ) {
+    return 'goja-load';
+  }
+  if (output.includes('bundle did not register extension'))
+    return 'extension-register';
+  return 'goja-runtime';
+}
+
+async function runRuntimeCommand(command, argumentsList, options, category) {
+  let result;
+  try {
+    result = await run(command, argumentsList, {
+      ...options,
+      capture: true,
+    });
+  } catch (error) {
+    throw new CliError(
+      `[runtime:${category}] Could not start ${command}: ${error.message}`,
+      5,
+    );
+  }
+  if (result.code === 0) return;
+  const output = `${result.stdout}\n${result.stderr}`.trim();
+  const phase = classifyRuntimeFailure(output, category);
+  throw new CliError(
+    `[runtime:${phase}] ${command} exited with ${result.code}.${output ? `\n${output}` : ''}`,
+    5,
+  );
+}
+
 async function runBundleHarness(core, bundlePath, extensionID) {
   await ensureEmbedDirectory(core, 'static/frontend');
   await ensureEmbedDirectory(core, 'static/scripts');
@@ -188,7 +225,7 @@ async function runBundleHarness(core, bundlePath, extensionID) {
     path.join(core, 'dice', 'zz_seal_template_runtime_test.go'),
     bundleHarness,
   );
-  await runChecked(
+  await runRuntimeCommand(
     'go',
     ['test', './dice', '-run', '^TestSealTemplateBundleRuntime$', '-count=1'],
     {
@@ -198,6 +235,7 @@ async function runBundleHarness(core, bundlePath, extensionID) {
         SEAL_TEMPLATE_EXTENSION_ID: extensionID,
       },
     },
+    'bundle',
   );
 }
 
@@ -206,7 +244,7 @@ async function runSealpackHarness(core, archivePath) {
     path.join(core, 'dice', 'sealpack', 'zz_seal_template_archive_test.go'),
     sealpackHarness,
   );
-  await runChecked(
+  await runRuntimeCommand(
     'go',
     [
       'test',
@@ -219,6 +257,7 @@ async function runSealpackHarness(core, archivePath) {
       cwd: core,
       env: { SEAL_TEMPLATE_ARCHIVE: path.resolve(archivePath) },
     },
+    'sealpack',
   );
 }
 

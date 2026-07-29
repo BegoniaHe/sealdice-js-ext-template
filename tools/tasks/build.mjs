@@ -5,6 +5,7 @@ import path from 'node:path';
 import { build, context } from 'esbuild';
 
 import {
+  buildTimestamp,
   loadExtensionMetadata,
   renderUserscriptHeader,
 } from '../cli/lib/metadata.mjs';
@@ -21,7 +22,9 @@ export function outputPath(config, mode) {
 }
 
 async function buildOptions({ config, mode, target, outfile }) {
-  const header = renderUserscriptHeader(await loadExtensionMetadata());
+  const header = renderUserscriptHeader(await loadExtensionMetadata(), {
+    timestamp: buildTimestamp(),
+  });
   const isProduction = mode === 'production';
   return {
     banner: { js: header },
@@ -30,6 +33,7 @@ async function buildOptions({ config, mode, target, outfile }) {
     entryPoints: [path.join(rootDirectory, config.build.entry)],
     format: 'iife',
     logLevel: 'error',
+    metafile: true,
     minify: isProduction,
     outfile,
     platform: 'browser',
@@ -50,10 +54,15 @@ export async function buildBundle({ config, mode = 'production', target }) {
   );
   const temporaryMap = `${temporary}.map`;
   try {
-    await build(
+    const result = await build(
       await buildOptions({ config, mode, target, outfile: temporary }),
     );
-    await assertRuntimePolicy(temporary, config);
+    await assertRuntimePolicy(temporary, config, {
+      sourceFiles: Object.keys(result.metafile.inputs).map((input) => {
+        const file = path.resolve(rootDirectory, input);
+        return { name: path.relative(rootDirectory, file), path: file };
+      }),
+    });
     if (mode !== 'production') {
       const source = await fs.readFile(temporary, 'utf8');
       const finalMap = `${destination}.map`;

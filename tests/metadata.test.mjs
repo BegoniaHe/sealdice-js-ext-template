@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   artifactName,
+  buildTimestamp,
   renderUserscriptHeader,
   validateExtensionMetadata,
 } from '../tools/cli/lib/metadata.mjs';
@@ -31,6 +32,22 @@ test('metadata renders a deterministic userscript header', () => {
 `,
   );
   assert.equal(artifactName(metadata), 'sealdice-extension-1.2.3.js');
+});
+
+test('build timestamps use SOURCE_DATE_EPOCH for reproducible release headers', () => {
+  assert.equal(
+    buildTimestamp({ environment: { SOURCE_DATE_EPOCH: '1700000000' } }),
+    1_700_000_000,
+  );
+  assert.equal(buildTimestamp({ environment: {}, now: 4_200 }), 4);
+  assert.match(
+    renderUserscriptHeader(metadata, { timestamp: 1_700_000_000 }),
+    /\/\/ @timestamp {4}1700000000\n/,
+  );
+  assert.throws(
+    () => buildTimestamp({ environment: { SOURCE_DATE_EPOCH: 'tomorrow' } }),
+    /SOURCE_DATE_EPOCH/,
+  );
 });
 
 test('release metadata rejects template values and invalid identifiers', () => {

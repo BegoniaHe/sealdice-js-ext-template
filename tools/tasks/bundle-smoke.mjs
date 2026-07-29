@@ -23,13 +23,49 @@ assert.match(
 );
 
 const host = await createMockHost(target);
-vm.runInNewContext(source, { Math, seal: host.seal }, { filename: output });
+try {
+  vm.runInNewContext(
+    source,
+    { Math, seal: host.seal, ...host.globals },
+    { filename: output },
+  );
+} catch (error) {
+  const phase = host.events.some(({ kind }) => kind === 'config-register')
+    ? 'config-init'
+    : 'mock-init';
+  const lastEvent = host.lastEvent();
+  const trace = lastEvent ? ` Last host call: ${lastEvent.kind}.` : '';
+  throw new Error(
+    `[runtime:${phase}] Bundle execution failed: ${error.message}.${trace}`,
+    { cause: error },
+  );
+}
 const extension = host.extensions.get((await loadExtensionMetadata()).id);
-assert.ok(extension, 'bundle did not register an extension');
+assert.ok(
+  extension,
+  `[runtime:extension-register] Bundle did not register an extension. Last host call: ${host.lastEvent()?.kind ?? 'none'}.`,
+);
 assert.equal(typeof extension.cmdMap.seal?.solve, 'function');
 
-const help = extension.cmdMap.seal.solve({}, {}, { getArgN: () => 'help' });
+let help;
+try {
+  help = extension.cmdMap.seal.solve({}, {}, { getArgN: () => 'help' });
+} catch (error) {
+  throw new Error(
+    `[runtime:mock-command] Command setup failed: ${error.message}`,
+    {
+      cause: error,
+    },
+  );
+}
 assert.deepEqual(help, { showHelp: true, solved: true });
-extension.cmdMap.seal.solve({}, {}, { getArgN: () => '' });
+try {
+  extension.cmdMap.seal.solve({}, {}, { getArgN: () => '' });
+} catch (error) {
+  throw new Error(
+    `[runtime:mock-command] Command execution failed: ${error.message}`,
+    { cause: error },
+  );
+}
 assert.match(host.replies.at(-1), /你抓到一只海豹/u);
 process.stdout.write(`Bundle smoke test passed for ${target}.\n`);

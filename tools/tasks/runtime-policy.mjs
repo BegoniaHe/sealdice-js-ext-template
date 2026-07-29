@@ -84,24 +84,31 @@ function stringLiteralValue(node) {
     : null;
 }
 
-export function runtimePolicyViolations(source, allowedGlobals = []) {
+function runtimePolicyViolationDetails(source, allowedGlobals = []) {
   const allowed = new Set(allowedGlobals);
   const file = ts.createSourceFile(
-    'bundle.js',
+    'runtime-policy.ts',
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.JS,
+    ts.ScriptKind.TS,
   );
   const bindings = collectBindings(file);
-  const violations = new Set();
-  const record = (name, allowException = true) => {
-    if (!allowException || !allowed.has(name)) violations.add(name);
+  const violations = new Map();
+  const record = (name, node, allowException = true) => {
+    if (allowException && allowed.has(name)) return;
+    if (violations.has(name)) return;
+    const position = file.getLineAndCharacterOfPosition(node.getStart(file));
+    violations.set(name, {
+      column: position.character + 1,
+      line: position.line + 1,
+      name,
+    });
   };
   const visit = (node) => {
     if (ts.isImportDeclaration(node)) {
       const moduleName = stringLiteralValue(node.moduleSpecifier);
-      if (moduleName?.startsWith('node:')) record(moduleName, false);
+      if (moduleName?.startsWith('node:')) record(moduleName, node, false);
     }
     if (
       ts.isCallExpression(node) &&
@@ -109,14 +116,14 @@ export function runtimePolicyViolations(source, allowedGlobals = []) {
       node.expression.text === 'require'
     ) {
       const moduleName = stringLiteralValue(node.arguments[0]);
-      if (moduleName?.startsWith('node:')) record(moduleName, false);
+      if (moduleName?.startsWith('node:')) record(moduleName, node, false);
     }
     if (
       ts.isCallExpression(node) &&
       node.expression.kind === ts.SyntaxKind.ImportKeyword
     ) {
       const moduleName = stringLiteralValue(node.arguments[0]);
-      if (moduleName?.startsWith('node:')) record(moduleName, false);
+      if (moduleName?.startsWith('node:')) record(moduleName, node, false);
     }
     if (
       ts.isIdentifier(node) &&
@@ -124,7 +131,7 @@ export function runtimePolicyViolations(source, allowedGlobals = []) {
       !bindings.has(node.text) &&
       isReferenceIdentifier(node)
     ) {
-      record(node.text);
+      record(node.text, node);
     }
     if (
       ts.isPropertyAccessExpression(node) &&
@@ -132,7 +139,7 @@ export function runtimePolicyViolations(source, allowedGlobals = []) {
       globalObjectNames.has(node.expression.text) &&
       unsupportedGlobals.has(node.name.text)
     ) {
-      record(node.name.text);
+      record(node.name.text, node.name);
     }
     if (
       ts.isElementAccessExpression(node) &&
@@ -140,24 +147,79 @@ export function runtimePolicyViolations(source, allowedGlobals = []) {
       globalObjectNames.has(node.expression.text)
     ) {
       const property = stringLiteralValue(node.argumentExpression);
-      if (property && unsupportedGlobals.has(property)) record(property);
+      if (property && unsupportedGlobals.has(property)) record(property, node);
     }
     ts.forEachChild(node, visit);
   };
   visit(file);
-  return [...violations].sort();
+  return [...violations.values()].sort((left, right) =>
+    left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+  );
 }
 
-export async function assertRuntimePolicy(bundlePath, config) {
+export function runtimePolicyViolations(source, allowedGlobals = []) {
+  return runtimePolicyViolationDetails(source, allowedGlobals).map(
+    ({ name }) => name,
+  );
+}
+
+export function runtimePolicyLocations(source, allowedGlobals = []) {
+  return runtimePolicyViolationDetails(source, allowedGlobals);
+}
+
+function remediationFor(name) {
+  if (name.startsWith('node:'))
+    return 'replace the Node built-in with a browser-compatible dependency';
+  if (name === 'process' || name === 'Buffer')
+    return 'remove the Node global from plugin runtime code';
+  return `avoid ${name} or add it to runtime.allowedGlobals only after real-runtime review`;
+}
+
+function sourceLocation(detail) {
+  if (!detail.source) return `bundle.js:${detail.line}:${detail.column}`;
+  return `${detail.source}:${detail.line}:${detail.column}`;
+}
+
+function runtimePolicyMessage(details) {
+  const locations = details
+    .map((detail) => `${detail.name} at ${sourceLocation(detail)}`)
+    .join(', ');
+  const remedies = details
+    .map((detail) => `${detail.name}: ${remediationFor(detail.name)}`)
+    .join('; ');
+  return `[runtime:static-policy] SealDice goja does not provide ${details
+    .map(({ name }) => name)
+    .join(', ')}. Detected ${locations}. Suggested fix: ${remedies}.`;
+}
+
+export async function assertRuntimePolicy(
+  bundlePath,
+  config,
+  { sourceFiles = [] } = {},
+) {
   const source = await fs.readFile(bundlePath, 'utf8');
-  const violations = runtimePolicyViolations(
+  const violations = runtimePolicyLocations(
     source,
     config.runtime.allowedGlobals,
   );
   if (violations.length) {
-    throw new CliError(
-      `Bundle references globals unavailable by default in the SealDice goja runtime: ${violations.join(', ')}. Add a reviewed runtime.allowedGlobals exception only after core-backed runtime verification.`,
-      4,
+    const locationsByName = new Map();
+    for (const sourceFile of sourceFiles) {
+      const sourceText = await fs.readFile(sourceFile.path, 'utf8');
+      for (const detail of runtimePolicyLocations(
+        sourceText,
+        config.runtime.allowedGlobals,
+      )) {
+        if (!locationsByName.has(detail.name))
+          locationsByName.set(detail.name, {
+            ...detail,
+            source: sourceFile.name,
+          });
+      }
+    }
+    const detailedViolations = violations.map(
+      (detail) => locationsByName.get(detail.name) ?? detail,
     );
+    throw new CliError(runtimePolicyMessage(detailedViolations), 4);
   }
 }
